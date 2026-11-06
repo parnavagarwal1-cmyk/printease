@@ -7,10 +7,12 @@ import {
   RefreshCw, 
   QrCode, 
   Key,
-  Building2
+  Building2,
+  ShieldCheck
 } from 'lucide-react';
 import { CustomerPrintPortal } from './components/CustomerPrintPortal';
 import { ShopOwnerDashboard } from './components/ShopOwnerDashboard';
+import { SuperAdminControlPlane } from './components/SuperAdminControlPlane';
 import { PairingHelperModal } from './components/PairingHelperModal';
 
 interface HealthData {
@@ -41,7 +43,7 @@ interface HealthData {
 }
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'customer' | 'dashboard' | 'system'>('customer');
+  const [activeTab, setActiveTab] = useState<'customer' | 'dashboard' | 'admin' | 'system'>('customer');
   const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +115,19 @@ export function App() {
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              Shop Owner Dashboard
+              Shop Owner
+            </button>
+
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'admin'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Super Admin
             </button>
 
             <button
@@ -125,7 +139,7 @@ export function App() {
               }`}
             >
               <Server className="w-3.5 h-3.5" />
-              System Diagnostics
+              Diagnostics
             </button>
 
             <button
@@ -148,6 +162,8 @@ export function App() {
           />
         ) : activeTab === 'dashboard' ? (
           <ShopOwnerDashboard />
+        ) : activeTab === 'admin' ? (
+          <SuperAdminControlPlane />
         ) : (
           /* System Architecture & Diagnostics View */
           <div className="space-y-8">
@@ -249,10 +265,10 @@ export function App() {
                 </div>
 
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                  <div className="font-bold text-indigo-600">Branch & Agent Keys</div>
-                  <p><span className="text-slate-500">Branch QR:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">pe_demo_connaught_branch_token_99</code></p>
-                  <p><span className="text-slate-500">Pairing Code:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono font-bold text-indigo-700">PRNT-8821-X9</code></p>
-                  <p><span className="text-slate-500">Branch:</span> <span className="font-semibold text-slate-700">Connaught Place Main Branch</span></p>
+                  <div className="font-bold text-indigo-600">Super Admin Root Account</div>
+                  <p><span className="text-slate-500">Email:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">superadmin@printease.com</code></p>
+                  <p><span className="text-slate-500">Password:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">Secret@12345</code></p>
+                  <p><span className="text-slate-500">Role:</span> <span className="font-semibold text-slate-700">Super Admin</span></p>
                 </div>
               </div>
             </div>

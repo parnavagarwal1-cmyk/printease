@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Plan;
 use App\Models\Shop;
+use App\Models\Subscription;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -124,5 +126,55 @@ class ShopController extends Controller
         ]);
 
         return response()->json(['message' => 'Shop updated successfully', 'shop' => $shop]);
+    }
+
+    /**
+     * Subscribe or change SaaS plan for shop.
+     */
+    public function subscribe(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->canAccessShop($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this shop.'], 403);
+        }
+
+        $shop = Shop::findOrFail($id);
+
+        $validated = $request->validate([
+            'plan_slug' => ['required', 'string', 'in:starter,pro,fleet'],
+        ]);
+
+        $plan = Plan::where('slug', $validated['plan_slug'])->firstOrFail();
+
+        // Expire older active subscriptions
+        Subscription::where('shop_id', $shop->id)
+            ->where('status', 'active')
+            ->update(['status' => 'cancelled', 'ends_at' => now()]);
+
+        // Create new active subscription
+        $subscription = Subscription::create([
+            'shop_id' => $shop->id,
+            'plan_id' => $plan->id,
+            'status' => 'active',
+            'starts_at' => now(),
+            'ends_at' => now()->addMonth(),
+        ]);
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'shop_id' => $shop->id,
+            'action' => 'subscription_changed',
+            'entity_type' => 'subscription',
+            'entity_id' => $subscription->id,
+            'ip_address' => $request->ip(),
+            'details' => ['plan' => $plan->name, 'monthly_price' => $plan->monthly_price],
+        ]);
+
+        return response()->json([
+            'message' => "Successfully subscribed to {$plan->name} plan.",
+            'subscription' => $subscription->load('plan'),
+            'shop' => $shop->fresh(['activeSubscription.plan', 'branches']),
+        ]);
     }
 }

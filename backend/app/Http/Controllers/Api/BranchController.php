@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\DesktopDevice;
 use App\Models\Order;
+use App\Models\Plan;
 use App\Models\PricingRule;
 use App\Models\PrintJob;
 use App\Models\Printer;
@@ -65,6 +66,18 @@ class BranchController extends Controller
 
         if (!$user->canAccessShop((int) $validated['shop_id'])) {
             return response()->json(['message' => 'Forbidden: You do not own or manage this shop.'], 403);
+        }
+
+        $shop = Shop::with(['branches', 'activeSubscription.plan'])->findOrFail((int) $validated['shop_id']);
+        $plan = $shop->activeSubscription?->plan ?? Plan::where('slug', 'starter')->first();
+        $maxBranches = $plan ? $plan->max_branches : 1;
+
+        if ($shop->branches()->count() >= $maxBranches) {
+            return response()->json([
+                'message' => "Branch limit of {$maxBranches} reached for your {$plan?->name} plan. Please upgrade your subscription plan to add more branches.",
+                'current_branches' => $shop->branches()->count(),
+                'max_allowed' => $maxBranches,
+            ], 403);
         }
 
         $branch = Branch::create($validated);
@@ -347,7 +360,17 @@ class BranchController extends Controller
             return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
         }
 
-        $branch = Branch::findOrFail($id);
+        $branch = Branch::with(['printers', 'shop.activeSubscription.plan'])->findOrFail($id);
+        $plan = $branch->shop->activeSubscription?->plan ?? Plan::where('slug', 'starter')->first();
+        $maxPrinters = $plan ? $plan->max_printers_per_branch : 2;
+
+        if ($branch->printers()->count() >= $maxPrinters) {
+            return response()->json([
+                'message' => "Printer limit of {$maxPrinters} reached for this branch on the {$plan?->name} plan. Please upgrade your subscription plan to add more printers.",
+                'current_printers' => $branch->printers()->count(),
+                'max_allowed' => $maxPrinters,
+            ], 403);
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

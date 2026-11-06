@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\DesktopDeviceController;
@@ -108,6 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/shops', [ShopController::class, 'store']);
     Route::get('/shops/{id}', [ShopController::class, 'show']);
     Route::put('/shops/{id}', [ShopController::class, 'update']);
+    Route::post('/shops/{id}/subscribe', [ShopController::class, 'subscribe']);
 
     // Branches Management
     Route::get('/branches', [BranchController::class, 'index']);
@@ -120,4 +122,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/branches/{id}/pricing-rules', [BranchController::class, 'updatePricingRules']);
     Route::post('/branches/{id}/printers', [BranchController::class, 'addPrinter']);
     Route::get('/branches/{id}/qr-poster', [BranchController::class, 'qrPoster']);
+
+    // Super Admin Control Plane
+    Route::prefix('admin')->group(function () {
+        Route::get('/metrics', [AdminController::class, 'metrics']);
+        Route::get('/shops', [AdminController::class, 'shops']);
+        Route::put('/shops/{id}/status', [AdminController::class, 'updateShopStatus']);
+        Route::get('/audit-logs', [AdminController::class, 'auditLogs']);
+        Route::get('/plans', [AdminController::class, 'plans']);
+    });
 });
