@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\DesktopDevice;
+use App\Models\Order;
 use App\Models\PricingRule;
+use App\Models\PrintJob;
+use App\Models\Printer;
 use App\Models\QrCode;
 use App\Models\Shop;
 use Illuminate\Http\JsonResponse;
@@ -192,6 +195,234 @@ class BranchController extends Controller
                 'id' => $branch->id,
                 'name' => $branch->name,
                 'shop_name' => $branch->shop->name,
+            ],
+        ]);
+    }
+
+    /**
+     * Get branch analytics for shop dashboard.
+     */
+    public function analytics(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->canAccessBranch($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
+        }
+
+        $branch = Branch::with(['printers', 'desktopDevices'])->findOrFail($id);
+        $today = now()->startOfDay();
+
+        $todayOrders = Order::where('branch_id', $branch->id)
+            ->where('created_at', '>=', $today)
+            ->get();
+
+        $revenueToday = $todayOrders
+            ->whereIn('status', ['PAID', 'PRINT_QUEUED', 'DOWNLOADING', 'PRINTING', 'COMPLETED'])
+            ->sum('total_amount');
+
+        $printJobs = PrintJob::whereHas('order', fn($q) => $q->where('branch_id', $branch->id))->get();
+
+        $completedToday = $printJobs->where('status', 'COMPLETED')
+            ->where('completed_at', '>=', $today)
+            ->count();
+
+        $pendingJobs = $printJobs->whereIn('status', ['PRINT_QUEUED', 'DOWNLOADING', 'PRINTING'])->count();
+        $failedJobs = $printJobs->where('status', 'PRINT_FAILED')->count();
+
+        $activePrinters = $branch->printers->where('is_active', true)->count();
+        $onlineDevices = $branch->desktopDevices->where('status', 'online')->count();
+
+        return response()->json([
+            'branch' => [
+                'id' => $branch->id,
+                'name' => $branch->name,
+            ],
+            'analytics' => [
+                'revenue_today' => round((float) $revenueToday, 2),
+                'orders_today_count' => $todayOrders->count(),
+                'completed_prints_today' => $completedToday,
+                'pending_jobs_count' => $pendingJobs,
+                'failed_jobs_count' => $failedJobs,
+                'active_printers_count' => $activePrinters,
+                'online_devices_count' => $onlineDevices,
+            ],
+        ]);
+    }
+
+    /**
+     * Get branch orders list.
+     */
+    public function orders(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->canAccessBranch($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
+        }
+
+        $status = $request->query('status');
+        $query = Order::where('branch_id', $id)
+            ->with(['files', 'items', 'printJobs'])
+            ->orderBy('created_at', 'desc');
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        $orders = $query->limit(50)->get();
+
+        return response()->json([
+            'orders' => $orders,
+            'count' => $orders->count(),
+        ]);
+    }
+
+    /**
+     * Update branch pricing rules.
+     */
+    public function updatePricingRules(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->canAccessBranch($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
+        }
+
+        $branch = Branch::findOrFail($id);
+
+        $validated = $request->validate([
+            'rules' => ['required', 'array', 'min:1'],
+            'rules.*.paper_size' => ['required', 'string', 'max:20'],
+            'rules.*.bw_single_price' => ['required', 'numeric', 'min:0'],
+            'rules.*.bw_duplex_price' => ['required', 'numeric', 'min:0'],
+            'rules.*.color_single_price' => ['required', 'numeric', 'min:0'],
+            'rules.*.color_duplex_price' => ['required', 'numeric', 'min:0'],
+            'rules.*.duplex_pricing_mode' => ['required', 'in:per_side,per_sheet'],
+            'rules.*.min_order_amount' => ['required', 'numeric', 'min:0'],
+            'rules.*.tax_rate_percent' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $updatedRules = [];
+        foreach ($validated['rules'] as $ruleData) {
+            $rule = PricingRule::updateOrCreate(
+                [
+                    'branch_id' => $branch->id,
+                    'paper_size' => strtoupper($ruleData['paper_size']),
+                ],
+                [
+                    'bw_single_price' => $ruleData['bw_single_price'],
+                    'bw_duplex_price' => $ruleData['bw_duplex_price'],
+                    'color_single_price' => $ruleData['color_single_price'],
+                    'color_duplex_price' => $ruleData['color_duplex_price'],
+                    'duplex_pricing_mode' => $ruleData['duplex_pricing_mode'],
+                    'min_order_amount' => $ruleData['min_order_amount'],
+                    'tax_rate_percent' => $ruleData['tax_rate_percent'],
+                    'is_active' => true,
+                ]
+            );
+            $updatedRules[] = $rule;
+        }
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'shop_id' => $branch->shop_id,
+            'action' => 'pricing_rules_updated',
+            'entity_type' => 'branch',
+            'entity_id' => $branch->id,
+            'ip_address' => $request->ip(),
+            'details' => ['rules_count' => count($updatedRules)],
+        ]);
+
+        return response()->json([
+            'message' => 'Pricing rules updated successfully',
+            'pricing_rules' => $updatedRules,
+        ]);
+    }
+
+    /**
+     * Add new printer to branch.
+     */
+    public function addPrinter(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->canAccessBranch($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
+        }
+
+        $branch = Branch::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'model' => ['nullable', 'string', 'max:255'],
+            'connection_type' => ['required', 'in:usb,network,bluetooth,cloud'],
+            'supports_color' => ['required', 'boolean'],
+            'supports_duplex' => ['required', 'boolean'],
+            'supported_paper_sizes' => ['required', 'array'],
+        ]);
+
+        $printer = Printer::create([
+            'branch_id' => $branch->id,
+            'name' => $validated['name'],
+            'system_printer_name' => $validated['name'],
+            'model' => $validated['model'] ?? 'Standard Printer',
+            'capabilities' => [
+                'color' => (bool) $validated['supports_color'],
+                'duplex' => (bool) $validated['supports_duplex'],
+                'paper_sizes' => $validated['supported_paper_sizes'],
+            ],
+            'status' => 'idle',
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'message' => 'Printer added successfully',
+            'printer' => $printer,
+        ], 201);
+    }
+
+    /**
+     * Generate printable QR Code poster data.
+     */
+    public function qrPoster(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->canAccessBranch($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
+        }
+
+        $branch = Branch::with(['shop', 'activeQrCode', 'pricingRules'])->findOrFail($id);
+        $qrCode = $branch->activeQrCode;
+
+        if (!$qrCode) {
+            $qrCode = QrCode::create([
+                'branch_id' => $branch->id,
+                'token' => 'pe_' . Str::random(32),
+                'name' => 'Default Counter QR',
+                'is_active' => true,
+            ]);
+        }
+
+        $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
+        $scanUrl = "{$frontendUrl}/scan/{$qrCode->token}";
+
+        return response()->json([
+            'poster' => [
+                'shop_name' => $branch->shop->name,
+                'shop_logo_url' => $branch->shop->logo_url,
+                'branch_name' => $branch->name,
+                'branch_address' => $branch->address,
+                'branch_phone' => $branch->phone,
+                'qr_token' => $qrCode->token,
+                'scan_url' => $scanUrl,
+                'tagline' => 'Self-Service Contactless Printing',
+                'steps' => [
+                    ['step' => 1, 'title' => 'Scan QR Code', 'description' => 'Open camera on your smartphone'],
+                    ['step' => 2, 'title' => 'Upload PDF', 'description' => 'Select color, sides, and copies'],
+                    ['step' => 3, 'title' => 'Pay & Print', 'description' => 'Instant UPI / Card release to counter'],
+                ],
+                'pricing_summary' => $branch->pricingRules->map(fn($r) => [
+                    'paper_size' => $r->paper_size,
+                    'bw_starting' => $r->bw_single_price,
+                    'color_starting' => $r->color_single_price,
+                ]),
             ],
         ]);
     }

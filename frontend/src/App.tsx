@@ -6,9 +6,11 @@ import {
   HardDrive, 
   RefreshCw, 
   QrCode, 
-  Key
+  Key,
+  Building2
 } from 'lucide-react';
 import { CustomerPrintPortal } from './components/CustomerPrintPortal';
+import { ShopOwnerDashboard } from './components/ShopOwnerDashboard';
 import { PairingHelperModal } from './components/PairingHelperModal';
 
 interface HealthData {
@@ -39,7 +41,7 @@ interface HealthData {
 }
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'customer' | 'system'>('customer');
+  const [activeTab, setActiveTab] = useState<'customer' | 'dashboard' | 'system'>('customer');
   const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +105,18 @@ export function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'dashboard'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Shop Owner Dashboard
+            </button>
+
+            <button
               onClick={() => setActiveTab('system')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                 activeTab === 'system'
@@ -132,6 +146,8 @@ export function App() {
             defaultQrToken="pe_demo_connaught_branch_token_99" 
             onOpenPairingInfo={() => setShowPairingModal(true)}
           />
+        ) : activeTab === 'dashboard' ? (
+          <ShopOwnerDashboard />
         ) : (
           /* System Architecture & Diagnostics View */
           <div className="space-y-8">
@@ -149,7 +165,7 @@ export function App() {
                   <button
                     onClick={fetchHealth}
                     disabled={loading}
-                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors disabled:opacity-50"
+                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                   </button>

@@ -115,4 +115,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/branches/{id}', [BranchController::class, 'show']);
     Route::put('/branches/{id}', [BranchController::class, 'update']);
     Route::post('/branches/{id}/pairing-code', [BranchController::class, 'generatePairingCode']);
+    Route::get('/branches/{id}/analytics', [BranchController::class, 'analytics']);
+    Route::get('/branches/{id}/orders', [BranchController::class, 'orders']);
+    Route::put('/branches/{id}/pricing-rules', [BranchController::class, 'updatePricingRules']);
+    Route::post('/branches/{id}/printers', [BranchController::class, 'addPrinter']);
+    Route::get('/branches/{id}/qr-poster', [BranchController::class, 'qrPoster']);
 });
