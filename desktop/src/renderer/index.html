@@ -36,6 +36,17 @@
           </svg>
           <span>Node Status</span>
         </button>
+        <button class="nav-item" data-tab="queue">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span>Print Spooler Queue</span>
+        </button>
         <button class="nav-item" data-tab="printers">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -68,14 +79,19 @@
           <h1 class="page-title" id="page-title">Desktop Agent Spooler</h1>
           <p class="page-subtitle">Windows background print engine & hardware daemon</p>
         </div>
-        <button class="btn btn-secondary" id="btn-refresh">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-          <span>Check Status</span>
-        </button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary" id="btn-poll-now">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span>Poll Jobs Now</span>
+          </button>
+          <button class="btn btn-secondary" id="btn-refresh">
+            <span>Refresh</span>
+          </button>
+        </div>
       </header>
 
       <div class="content-body">
@@ -144,6 +160,24 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Print Queue & Spooler Tab -->
+        <div class="tab-pane" id="pane-queue">
+          <div class="card">
+            <div class="card-header flex-between">
+              <div>
+                <h2 class="card-title">Live Print Spooler Activity</h2>
+                <p class="card-subtitle">Real-time telemetry of polled, claimed, and executed print jobs</p>
+              </div>
+              <span class="badge badge-success" id="queue-polling-indicator">● Auto-Polling (5s)</span>
+            </div>
+            <div class="card-body">
+              <div id="spooler-feed" class="spooler-feed">
+                <div class="empty-state" id="empty-feed-msg">No print jobs received yet. Polling branch queue...</div>
+              </div>
             </div>
           </div>
         </div>

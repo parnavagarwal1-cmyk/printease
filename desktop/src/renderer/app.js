@@ -5,6 +5,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAppInfo();
   await refreshBackendStatus();
   await scanPrinters();
+  await loadRecentJobs();
+
+  // Listen for real-time print events from background worker
+  if (window.electronAPI.onJobStatusUpdate) {
+    window.electronAPI.onJobStatusUpdate((event) => {
+      handleLiveJobEvent(event);
+    });
+  }
 });
 
 function setupTabs() {
@@ -19,9 +27,11 @@ function setupTabs() {
 
       tab.classList.add('active');
       const target = tab.getAttribute('data-tab');
-      document.getElementById(`pane-${target}`).classList.add('active');
+      const pane = document.getElementById(`pane-${target}`);
+      if (pane) pane.classList.add('active');
 
       if (target === 'status') title.textContent = 'Desktop Agent Spooler';
+      if (target === 'queue') title.textContent = 'Print Spooler Queue';
       if (target === 'printers') title.textContent = 'Installed Windows Printers';
       if (target === 'pairing') title.textContent = 'Device Pairing & Security';
     });
@@ -32,7 +42,25 @@ function setupEventListeners() {
   document.getElementById('btn-refresh').addEventListener('click', async () => {
     await refreshBackendStatus();
     await scanPrinters();
+    await loadRecentJobs();
   });
+
+  const btnPoll = document.getElementById('btn-poll-now');
+  if (btnPoll) {
+    btnPoll.addEventListener('click', async () => {
+      btnPoll.disabled = true;
+      btnPoll.innerHTML = '<span>Polling...</span>';
+      try {
+        await window.electronAPI.pollNow();
+        await loadRecentJobs();
+      } catch (err) {
+        console.error('Manual poll error:', err);
+      } finally {
+        btnPoll.disabled = false;
+        btnPoll.innerHTML = '<span>Poll Jobs Now</span>';
+      }
+    });
+  }
 
   document.getElementById('btn-rescan-printers').addEventListener('click', async () => {
     await scanPrinters();
@@ -57,6 +85,7 @@ function setupEventListeners() {
       document.getElementById('val-device-sub').textContent = res.branch ? `${res.branch.name} (${res.branch.shop_name})` : 'Active';
       document.getElementById('info-branch').textContent = res.branch ? `${res.branch.name} (${res.branch.shop_name})` : 'Paired';
       await refreshBackendStatus();
+      await loadRecentJobs();
     } else {
       resultBox.innerHTML = `<span style="color:#EF4444; font-size:12px;">✗ ${res.message}</span>`;
     }
@@ -139,6 +168,65 @@ async function scanPrinters() {
   } catch (err) {
     container.innerHTML = `<div style="color:#EF4444; font-size:12px;">Failed to scan printers: ${err.message}</div>`;
   }
+}
+
+async function loadRecentJobs() {
+  const feed = document.getElementById('spooler-feed');
+  if (!feed || !window.electronAPI.getRecentJobs) return;
+
+  try {
+    const jobs = await window.electronAPI.getRecentJobs();
+    if (!jobs || jobs.length === 0) {
+      feed.innerHTML = '<div class="empty-state">No print jobs received yet. Polling branch queue...</div>';
+      return;
+    }
+
+    feed.innerHTML = '';
+    jobs.forEach(job => {
+      feed.appendChild(createJobElement(job));
+    });
+  } catch (err) {
+    console.error('Error loading recent jobs:', err);
+  }
+}
+
+function handleLiveJobEvent(event) {
+  const feed = document.getElementById('spooler-feed');
+  if (!feed) return;
+
+  const emptyMsg = document.getElementById('empty-feed-msg');
+  if (emptyMsg) emptyMsg.remove();
+
+  // Prepend new live event to top of feed
+  const element = createJobElement(event);
+  feed.insertBefore(element, feed.firstChild);
+}
+
+function createJobElement(job) {
+  const div = document.createElement('div');
+  div.style.cssText = 'padding: 12px; border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 8px; background: white; display: flex; justify-content: space-between; align-items: center;';
+
+  const statusColor = job.status === 'COMPLETED' ? '#10B981' : (job.status === 'FAILED' ? '#EF4444' : '#6366F1');
+  const timeStr = job.timestamp ? new Date(job.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+  div.innerHTML = `
+    <div>
+      <div style="font-weight: 700; font-size: 13px; color: #0F172A;">
+        Job #${job.jobId} <span style="font-weight: 400; color: #64748B;">(${escapeHtml(job.orderNumber || 'Order')})</span>
+      </div>
+      <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
+        ${escapeHtml(job.message || job.status)} ${job.spoolerJobId ? `• Spooler Ref: ${job.spoolerJobId}` : ''}
+      </div>
+    </div>
+    <div style="text-align: right;">
+      <span style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; background: ${statusColor}15; color: ${statusColor}; text-transform: uppercase;">
+        ${escapeHtml(job.status)}
+      </span>
+      <div style="font-size: 10px; color: #94A3B8; margin-top: 4px;">${timeStr}</div>
+    </div>
+  `;
+
+  return div;
 }
 
 window.selectPrinter = function(printerName) {

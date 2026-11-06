@@ -1,9 +1,12 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { WindowsPrinterAdapter } = require('./adapters/printerAdapter');
+const { PrintWorker } = require('./worker/printWorker');
 
 let mainWindow = null;
 let printerAdapter = null;
+let printWorker = null;
+const recentJobs = [];
 
 let deviceConfig = {
   backendUrl: 'http://127.0.0.1:8000',
@@ -19,8 +22,8 @@ let deviceConfig = {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 960,
-    height: 680,
+    width: 1020,
+    height: 720,
     minWidth: 800,
     minHeight: 560,
     title: 'PrintEase Desktop Agent',
@@ -35,11 +38,32 @@ function createWindow() {
   });
 
   printerAdapter = new WindowsPrinterAdapter(mainWindow);
+
+  printWorker = new PrintWorker({
+    getConfig: () => deviceConfig,
+    printerAdapter,
+    onEvent: (event, data) => {
+      if (event === 'job:status-update') {
+        const entry = { ...data, timestamp: new Date().toISOString() };
+        recentJobs.unshift(entry);
+        if (recentJobs.length > 50) recentJobs.pop();
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(event, data);
+      }
+    }
+  });
+
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Start polling worker if already paired
+  if (deviceConfig.paired && deviceConfig.deviceToken) {
+    printWorker.start(deviceConfig.pollIntervalMs);
+  }
 }
 
 app.whenReady().then(() => {
@@ -53,10 +77,15 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  if (printWorker) {
+    printWorker.stop();
+  }
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
+
+// --- IPC Handlers ---
 
 ipcMain.handle('app:version', () => {
   return {
@@ -144,6 +173,11 @@ ipcMain.handle('device:pair', async (event, pairingCode) => {
     deviceConfig.branchName = data.branch.name;
     deviceConfig.shopName = data.branch.shop_name;
 
+    // Start background print polling worker
+    if (printWorker) {
+      printWorker.start(deviceConfig.pollIntervalMs);
+    }
+
     return {
       success: true,
       message: data.message,
@@ -153,4 +187,16 @@ ipcMain.handle('device:pair', async (event, pairingCode) => {
   } catch (err) {
     return { success: false, message: err.message || 'Failed to connect to backend during pairing' };
   }
+});
+
+ipcMain.handle('jobs:pollNow', async () => {
+  if (!printWorker) {
+    return { success: false, message: 'Worker not initialized' };
+  }
+  await printWorker.triggerPoll();
+  return { success: true, recentJobs };
+});
+
+ipcMain.handle('jobs:recent', () => {
+  return recentJobs;
 });

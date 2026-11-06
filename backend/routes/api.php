@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\DesktopDeviceController;
+use App\Http\Controllers\Api\DesktopJobController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PublicOrderController;
 use App\Http\Controllers\Api\ShopController;
@@ -72,6 +73,12 @@ Route::prefix('desktop')->group(function () {
     Route::post('/pair', [DesktopDeviceController::class, 'pair']);
     Route::post('/heartbeat', [DesktopDeviceController::class, 'heartbeat']);
     Route::get('/printers', [DesktopDeviceController::class, 'printers']);
+
+    // Print Jobs Polling, Claiming, Streaming, and Telemetry (Phase 5)
+    Route::get('/jobs/poll', [DesktopJobController::class, 'pollJobs']);
+    Route::post('/jobs/{id}/claim', [DesktopJobController::class, 'claimJob']);
+    Route::get('/jobs/{id}/download', [DesktopJobController::class, 'downloadFile']);
+    Route::post('/jobs/{id}/status', [DesktopJobController::class, 'updateStatus']);
 });
 
 // --- Public Customer QR & Order Endpoints ---
