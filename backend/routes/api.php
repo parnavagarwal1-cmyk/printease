@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\DesktopDeviceController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PublicOrderController;
 use App\Http\Controllers\Api\ShopController;
 use Illuminate\Http\Request;
@@ -80,7 +81,14 @@ Route::prefix('public')->group(function () {
     Route::post('/qr/{token}/upload', [PublicOrderController::class, 'uploadFile']);
     Route::post('/qr/{token}/orders', [PublicOrderController::class, 'createOrder']);
     Route::get('/orders/{orderNumber}', [PublicOrderController::class, 'getOrderStatus']);
+
+    // Payment Endpoints
+    Route::post('/orders/{orderNumber}/pay', [PaymentController::class, 'initiatePayment']);
+    Route::post('/orders/{orderNumber}/verify-payment', [PaymentController::class, 'verifyPayment']);
 });
+
+// --- Public Webhooks (Razorpay) ---
+Route::post('/webhooks/razorpay', [PaymentController::class, 'handleWebhook']);
 
 // --- Authenticated Tenant Endpoints (Sanctum) ---
 Route::middleware('auth:sanctum')->group(function () {

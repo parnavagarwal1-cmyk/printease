@@ -9,7 +9,9 @@ import {
   Printer, 
   Copy, 
   Check, 
-  Sparkles
+  Sparkles, 
+  ShieldCheck, 
+  CheckCircle2 
 } from 'lucide-react';
 import type { 
   QrResolutionResponse, 
@@ -60,6 +62,11 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   const [orderError, setOrderError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null);
   const [copiedOrderNumber, setCopiedOrderNumber] = useState<boolean>(false);
+
+  // Payment state
+  const [paying, setPaying] = useState<boolean>(false);
+  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // 1. Resolve Branch Details from QR Token
   const resolveBranch = useCallback(async (token: string) => {
@@ -213,10 +220,80 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
       const resData = await res.json();
       setCreatedOrder(resData.order);
+      setPaymentSuccess(false);
+      setPaymentError(null);
     } catch (err: any) {
       setOrderError(err.message || 'Failed to place order.');
     } finally {
       setSubmittingOrder(false);
+    }
+  };
+
+  // 5. Pay with Razorpay Test Mode
+  const handlePayNow = async () => {
+    if (!createdOrder) return;
+
+    setPaying(true);
+    setPaymentError(null);
+
+    try {
+      // Step A: Initiate Payment
+      const initRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!initRes.ok) {
+        const errData = await initRes.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to initiate Razorpay payment.');
+      }
+
+      const initData = await initRes.json();
+      const rzpOrderId = initData.razorpay.razorpay_order_id;
+      const rzpPaymentId = `pay_test_${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // Step B: Calculate mock signature via Web Crypto API with test secret "mock_secret_key_67890"
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode('mock_secret_key_67890');
+      const cryptoKey = await window.crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signatureBuffer = await window.crypto.subtle.sign(
+        'HMAC',
+        cryptoKey,
+        encoder.encode(`${rzpOrderId}|${rzpPaymentId}`)
+      );
+      const signatureHex = Array.from(new Uint8Array(signatureBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      // Step C: Verify Payment
+      const verifyRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/verify-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          razorpay_order_id: rzpOrderId,
+          razorpay_payment_id: rzpPaymentId,
+          razorpay_signature: signatureHex,
+        }),
+      });
+
+      if (!verifyRes.ok) {
+        const vErr = await verifyRes.json().catch(() => ({}));
+        throw new Error(vErr.message || 'Payment verification rejected.');
+      }
+
+      const vData = await verifyRes.json();
+      setPaymentSuccess(true);
+      setCreatedOrder(vData.order);
+    } catch (err: any) {
+      setPaymentError(err.message || 'Payment processing failed.');
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -241,7 +318,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
               <h2 className="text-white font-bold text-base flex items-center gap-2">
                 Customer Self-Service Terminal
                 <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  Phase 3 Live
+                  Phase 4 Razorpay Active
                 </span>
               </h2>
               <p className="text-xs text-slate-400">Simulate customer scanning shop QR code</p>
@@ -251,7 +328,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
           {onOpenPairingInfo && (
             <button
               onClick={onOpenPairingInfo}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 transition-colors flex items-center gap-1.5 self-start sm:self-center"
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 transition-colors flex items-center gap-1.5 self-start sm:self-center cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Windows Agent Pairing Code
@@ -275,7 +352,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
             <button
               onClick={() => resolveBranch(qrToken)}
               disabled={loadingBranch}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingBranch ? 'animate-spin' : ''}`} />
               Verify QR
@@ -312,23 +389,40 @@ export const CustomerPrintPortal: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* If Order Placed: Success Screen */}
+      {/* If Order Placed: Success Screen with Razorpay Checkout */}
       {createdOrder ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 p-8 text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
-            <CheckCircle className="w-8 h-8" />
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center">
+            {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' ? (
+              <CheckCircle2 className="w-9 h-9 text-emerald-600" />
+            ) : (
+              <CreditCard className="w-8 h-8" />
+            )}
           </div>
 
           <div>
-            <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 font-semibold text-xs rounded-full uppercase tracking-wider mb-2">
-              Status: {createdOrder.status}
+            <span className={`inline-block px-3 py-1 font-semibold text-xs rounded-full uppercase tracking-wider mb-2 ${
+              paymentSuccess || createdOrder.status === 'PRINT_QUEUED'
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                : 'bg-amber-100 text-amber-800 border border-amber-200'
+            }`}>
+              Status: {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' ? 'PRINT_QUEUED' : createdOrder.status}
             </span>
-            <h3 className="text-2xl font-black text-slate-900">Order Placed Successfully!</h3>
+
+            <h3 className="text-2xl font-black text-slate-900">
+              {paymentSuccess || createdOrder.status === 'PRINT_QUEUED'
+                ? 'Payment Successful & Job Queued!'
+                : 'Order Created — Ready for Payment'}
+            </h3>
+
             <p className="text-sm text-slate-600 max-w-md mx-auto mt-1">
-              Your document has been verified and stored in PrintEase private storage. Order is ready for payment initiation!
+              {paymentSuccess || createdOrder.status === 'PRINT_QUEUED'
+                ? 'Your payment was verified via HMAC-SHA256. Print job is enqueued and ready for the paired Windows Desktop Agent!'
+                : 'Your document is verified and stored securely. Complete payment to release the print job.'}
             </p>
           </div>
 
+          {/* Order Details Receipt Box */}
           <div className="max-w-md mx-auto bg-slate-50 rounded-xl p-5 border border-slate-200 text-left space-y-3">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200">
               <span className="text-xs text-slate-500 font-medium">Order Reference:</span>
@@ -336,7 +430,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                 <span className="font-mono font-bold text-slate-900 text-sm">{createdOrder.order_number}</span>
                 <button
                   onClick={copyOrderNumber}
-                  className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors"
+                  className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors cursor-pointer"
                   title="Copy Order Number"
                 >
                   {copiedOrderNumber ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
@@ -365,13 +459,57 @@ export const CustomerPrintPortal: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="flex justify-center gap-3">
+          {/* Payment Actions */}
+          {paymentError && (
+            <div className="max-w-md mx-auto p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2 text-left">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{paymentError}</span>
+            </div>
+          )}
+
+          {!(paymentSuccess || createdOrder.status === 'PRINT_QUEUED') ? (
+            <div className="max-w-md mx-auto space-y-3">
+              <button
+                onClick={handlePayNow}
+                disabled={paying}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {paying ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Verifying HMAC-SHA256 Signature...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Pay with Razorpay Test Mode (₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)})</span>
+                  </>
+                )}
+              </button>
+              <p className="text-[11px] text-slate-400">
+                Safe test mode transaction simulation. No real money will be charged.
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-md mx-auto bg-emerald-50/80 border border-emerald-200 rounded-xl p-4 text-left space-y-2">
+              <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <span>Print Job Released to Branch Spooler!</span>
+              </div>
+              <p className="text-xs text-slate-600">
+                The desktop agent paired with this branch will poll this job via lease-lock, download the PDF, and send it to the Windows spooler.
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-center gap-3 pt-2">
             <button
               onClick={() => {
                 setCreatedOrder(null);
                 setUploadedFile(null);
+                setPaymentSuccess(false);
               }}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition-colors"
+              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition-colors cursor-pointer"
             >
               Print Another Document
             </button>
@@ -430,7 +568,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
                 <button
                   onClick={() => setUploadedFile(null)}
-                  className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 transition-colors"
+                  className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
                 >
                   Change File
                 </button>
@@ -466,7 +604,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => setColorMode('bw')}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         colorMode === 'bw'
                           ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
                           : 'border-slate-200 hover:border-slate-300 text-slate-700'
@@ -479,7 +617,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => setColorMode('color')}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         colorMode === 'color'
                           ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
                           : 'border-slate-200 hover:border-slate-300 text-slate-700'
@@ -498,7 +636,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => setDuplexMode('single')}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         duplexMode === 'single'
                           ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
                           : 'border-slate-200 hover:border-slate-300 text-slate-700'
@@ -511,7 +649,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => setDuplexMode('duplex')}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                         duplexMode === 'duplex'
                           ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
                           : 'border-slate-200 hover:border-slate-300 text-slate-700'
@@ -543,7 +681,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => setCopies((prev) => Math.max(1, prev - 1))}
-                      className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold text-slate-700 text-base"
+                      className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold text-slate-700 text-base cursor-pointer"
                     >
                       -
                     </button>
@@ -551,7 +689,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => setCopies((prev) => Math.min(50, prev + 1))}
-                      className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold text-slate-700 text-base"
+                      className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold text-slate-700 text-base cursor-pointer"
                     >
                       +
                     </button>
@@ -699,7 +837,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
               <button
                 type="submit"
                 disabled={submittingOrder}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {submittingOrder ? (
                   <>
