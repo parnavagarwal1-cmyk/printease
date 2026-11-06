@@ -1,0 +1,21 @@
+{
+  "name": "printease-desktop",
+  "version": "1.0.0",
+  "description": "PrintEase Windows Desktop Agent & Print Spooler",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "keywords": [
+    "printing",
+    "spooler",
+    "electron",
+    "printease"
+  ],
+  "author": "PrintEase Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.1"
+  }
+}
