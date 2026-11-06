@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\DesktopDeviceController;
+use App\Http\Controllers\Api\PublicOrderController;
 use App\Http\Controllers\Api\ShopController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +71,15 @@ Route::prefix('desktop')->group(function () {
     Route::post('/pair', [DesktopDeviceController::class, 'pair']);
     Route::post('/heartbeat', [DesktopDeviceController::class, 'heartbeat']);
     Route::get('/printers', [DesktopDeviceController::class, 'printers']);
+});
+
+// --- Public Customer QR & Order Endpoints ---
+Route::prefix('public')->group(function () {
+    Route::get('/qr/{token}', [PublicOrderController::class, 'resolveQr']);
+    Route::post('/qr/{token}/estimate', [PublicOrderController::class, 'estimate']);
+    Route::post('/qr/{token}/upload', [PublicOrderController::class, 'uploadFile']);
+    Route::post('/qr/{token}/orders', [PublicOrderController::class, 'createOrder']);
+    Route::get('/orders/{orderNumber}', [PublicOrderController::class, 'getOrderStatus']);
 });
 
 // --- Authenticated Tenant Endpoints (Sanctum) ---

@@ -4,15 +4,12 @@ import {
   Database, 
   Server, 
   HardDrive, 
-  CheckCircle2, 
-  XCircle, 
   RefreshCw, 
   QrCode, 
-  LayoutDashboard, 
-  ArrowRight,
-  ShieldCheck,
-  UserCheck
+  Key
 } from 'lucide-react';
+import { CustomerPrintPortal } from './components/CustomerPrintPortal';
+import { PairingHelperModal } from './components/PairingHelperModal';
 
 interface HealthData {
   status: string;
@@ -42,10 +39,12 @@ interface HealthData {
 }
 
 export function App() {
+  const [activeTab, setActiveTab] = useState<'customer' | 'system'>('customer');
   const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastChecked, setLastChecked] = useState<Date>(new Date());
+  const [showPairingModal, setShowPairingModal] = useState<boolean>(false);
 
   const fetchHealth = async () => {
     setLoading(true);
@@ -71,8 +70,8 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans">
-      {/* Top Navigation */}
-      <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-50">
+      {/* Top Header */}
+      <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-[#4F46E5] flex items-center justify-center text-white shadow-sm shadow-[#4F46E5]/20">
@@ -81,336 +80,176 @@ export function App() {
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-extrabold text-xl tracking-tight text-[#0F172A]">PrintEase</span>
-                <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE]">
+                <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE]">
                   SaaS Core
                 </span>
               </div>
-              <p className="text-xs text-[#64748B]">Autonomous Multi-Shop QR Printing Network</p>
+              <p className="text-xs text-[#64748B]">Autonomous Multi-Shop Self-Service Printing</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="hidden sm:flex items-center space-x-2 text-xs text-[#64748B]">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Phase 2 Database & Auth Verified</span>
-            </div>
+          {/* Navigation Tabs */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setActiveTab('customer')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'customer'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              Customer Self-Service
+            </button>
 
             <button
-              onClick={fetchHealth}
-              disabled={loading}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold text-[#0F172A] hover:bg-[#F8FAFC] hover:border-[#94A3B8] transition-all disabled:opacity-50"
+              onClick={() => setActiveTab('system')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeTab === 'system'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#4F46E5]' : ''}`} />
-              <span>Refresh Status</span>
+              <Server className="w-3.5 h-3.5" />
+              System Diagnostics
+            </button>
+
+            <button
+              onClick={() => setShowPairingModal(true)}
+              className="ml-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Key className="w-3.5 h-3.5" />
+              Pairing Code
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Hero Banner */}
-        <section className="bg-gradient-to-r from-white via-white to-[#EEF2FF] border border-[#E2E8F0] rounded-2xl p-6 sm:p-8 shadow-sm">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#EEF2FF] border border-[#C7D2FE] text-[#4F46E5] text-xs font-medium mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#4F46E5]"></span>
-              <span>Phase 2 — Multi-Tenant Schema & Secure Auth</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] mb-3">
-              Relational Multi-Shop Core Online
-            </h1>
-            <p className="text-sm sm:text-base text-[#64748B] leading-relaxed mb-6">
-              Full multi-tenant architecture is active with foreign keys, Sanctum auth tokens, role isolation (Super Admin, Shop Owner, Branch Manager, Staff), and automated cross-tenant security enforcement.
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 shadow-xs">
-                <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider block">Backend</span>
-                <span className="text-sm font-bold text-[#0F172A]">Laravel 11 (PHP 8.3)</span>
-              </div>
-              <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 shadow-xs">
-                <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider block">Database</span>
-                <span className="text-sm font-bold text-[#0F172A]">MySQL 8.4 (18 Tables)</span>
-              </div>
-              <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 shadow-xs">
-                <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider block">Security</span>
-                <span className="text-sm font-bold text-[#0F172A]">Tenant Scoped + Sanctum</span>
-              </div>
-              <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 shadow-xs">
-                <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider block">Automated Tests</span>
-                <span className="text-sm font-bold text-emerald-600">10/10 Passing</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Live Diagnostics Card */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-[#0F172A]">Live System Diagnostics</h2>
-              <p className="text-xs text-[#64748B]">Real-time telemetry verified via Laravel <code className="text-[#4F46E5] bg-[#EEF2FF] px-1 py-0.5 rounded">/api/health</code></p>
-            </div>
-            <span className="text-xs text-[#64748B]">
-              Checked: {lastChecked.toLocaleTimeString()}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* API & PHP Card */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2 text-[#4F46E5]">
-                    <Server className="w-5 h-5" />
-                    <span className="font-semibold text-sm text-[#0F172A]">API Core Engine</span>
-                  </div>
-                  {health ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
-                      Healthy
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>
-                      Offline
-                    </span>
-                  )}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {activeTab === 'customer' ? (
+          <CustomerPrintPortal 
+            defaultQrToken="pe_demo_connaught_branch_token_99" 
+            onOpenPairingInfo={() => setShowPairingModal(true)}
+          />
+        ) : (
+          /* System Architecture & Diagnostics View */
+          <div className="space-y-8">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Platform Core Services</h2>
+                  <p className="text-xs text-slate-500">Live health monitoring across backend, database, and storage</p>
                 </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Framework:</span>
-                    <span className="font-semibold text-[#0F172A]">{health?.app?.laravel || 'Laravel 11'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">PHP Runtime:</span>
-                    <span className="font-semibold text-[#0F172A]">{health?.app?.php || '8.3.36'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Active Routes:</span>
-                    <span className="font-semibold text-[#0F172A]">17 REST Endpoints</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-[#64748B]">Auth Mechanism:</span>
-                    <span className="font-semibold text-[#4F46E5]">Laravel Sanctum</span>
-                  </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">
+                    Updated: {lastChecked.toLocaleTimeString()}
+                  </span>
+                  <button
+                    onClick={fetchHealth}
+                    disabled={loading}
+                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
               </div>
+
+              {loading && !health ? (
+                <div className="py-12 flex flex-col items-center justify-center text-slate-400">
+                  <RefreshCw className="w-8 h-8 animate-spin mb-3 text-indigo-600" />
+                  <p className="text-xs">Probing backend APIs...</p>
+                </div>
+              ) : error ? (
+                <div className="mt-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
+                  {error}
+                </div>
+              ) : health ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                  {/* Database Card */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2 text-slate-800 font-semibold text-xs">
+                        <Database className="w-4 h-4 text-indigo-600" />
+                        <span>MySQL 8.4 Database</span>
+                      </div>
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                        {health.services.database.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>Driver: <span className="font-mono">{health.services.database.driver}</span></p>
+                      <p>Version: <span className="font-mono">{health.services.database.version}</span></p>
+                    </div>
+                  </div>
+
+                  {/* Backend Card */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2 text-slate-800 font-semibold text-xs">
+                        <Server className="w-4 h-4 text-indigo-600" />
+                        <span>Laravel 11 Backend</span>
+                      </div>
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                        {health.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>Laravel: <span className="font-mono">{health.app.laravel}</span></p>
+                      <p>PHP: <span className="font-mono">{health.app.php}</span></p>
+                    </div>
+                  </div>
+
+                  {/* Storage Card */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2 text-slate-800 font-semibold text-xs">
+                        <HardDrive className="w-4 h-4 text-indigo-600" />
+                        <span>Private Storage</span>
+                      </div>
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                        {health.services.storage.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>Target: <span className="font-mono truncate block">storage/app/private</span></p>
+                      <p>Encryption: <span className="font-semibold text-emerald-600">Restricted</span></p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
-            {/* Database Card */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2 text-[#4F46E5]">
-                    <Database className="w-5 h-5" />
-                    <span className="font-semibold text-sm text-[#0F172A]">Relational Store</span>
-                  </div>
-                  {health?.services?.database?.status === 'connected' ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
-                      <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
-                      Connected
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
-                      <XCircle className="w-3 h-3 mr-1 text-red-600" />
-                      Error
-                    </span>
-                  )}
+            {/* Test Credentials Reference Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h3 className="font-bold text-sm text-slate-900 mb-4">Seeded Test Credentials & Tokens</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                  <div className="font-bold text-indigo-600">Demo Shop Owner Account</div>
+                  <p><span className="text-slate-500">Email:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">owner@metroprint.com</code></p>
+                  <p><span className="text-slate-500">Password:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">Secret@12345</code></p>
+                  <p><span className="text-slate-500">Role:</span> <span className="font-semibold text-slate-700">Shop Owner</span></p>
                 </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Engine:</span>
-                    <span className="font-semibold text-[#0F172A]">MySQL Community 8.4</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Database:</span>
-                    <span className="font-semibold text-[#0F172A]">printease</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Schema Scope:</span>
-                    <span className="font-semibold text-[#0F172A]">Multi-Tenant (18 Tables)</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-[#64748B]">Seed Status:</span>
-                    <span className="font-semibold text-emerald-600">Populated with Demo Fleet</span>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Private Storage Card */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2 text-[#4F46E5]">
-                    <HardDrive className="w-5 h-5" />
-                    <span className="font-semibold text-sm text-[#0F172A]">Private File Storage</span>
-                  </div>
-                  {health?.services?.storage?.status === 'writable' ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
-                      <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
-                      Writable
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">
-                      Checking
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Security Mode:</span>
-                    <span className="font-semibold text-emerald-600">Private (Non-Public)</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Storage Path:</span>
-                    <span className="font-mono text-[10px] text-[#0F172A] truncate max-w-[170px]">
-                      storage/app/private
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#F1F5F9]">
-                    <span className="text-[#64748B]">Document Retention:</span>
-                    <span className="font-semibold text-[#0F172A]">Configurable</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-[#64748B]">Access Protocol:</span>
-                    <span className="font-semibold text-[#4F46E5]">Signed / Device Auth</span>
-                  </div>
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                  <div className="font-bold text-indigo-600">Branch & Agent Keys</div>
+                  <p><span className="text-slate-500">Branch QR:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">pe_demo_connaught_branch_token_99</code></p>
+                  <p><span className="text-slate-500">Pairing Code:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono font-bold text-indigo-700">PRNT-8821-X9</code></p>
+                  <p><span className="text-slate-500">Branch:</span> <span className="font-semibold text-slate-700">Connaught Place Main Branch</span></p>
                 </div>
               </div>
             </div>
           </div>
-
-          {error && (
-            <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-xl p-4 text-xs text-[#991B1B] flex items-center justify-between">
-              <span>{error} — Make sure the Laravel backend server is running on port 8000.</span>
-              <button onClick={fetchHealth} className="underline font-semibold hover:text-red-900">Retry</button>
-            </div>
-          )}
-        </section>
-
-        {/* Phase 2 Feature Highlights */}
-        <section className="bg-white border border-[#E2E8F0] rounded-2xl p-6 shadow-xs space-y-4">
-          <div className="flex items-center space-x-2 text-[#4F46E5]">
-            <ShieldCheck className="w-5 h-5" />
-            <h2 className="text-base font-bold text-[#0F172A]">Phase 2 Security & Architecture Deliverables</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-[#64748B]">
-            <div className="border border-[#F1F5F9] rounded-xl p-4 bg-[#F8FAFC]">
-              <div className="flex items-center space-x-2 text-[#0F172A] font-bold mb-2">
-                <UserCheck className="w-4 h-4 text-[#4F46E5]" />
-                <span>Zero-Trust Auth & Roles</span>
-              </div>
-              <p className="leading-relaxed">
-                Super Admin, Shop Owner, Branch Manager, and Staff roles with server-side policy enforcement. Users cannot access or tamper with foreign shops or branches.
-              </p>
-            </div>
-
-            <div className="border border-[#F1F5F9] rounded-xl p-4 bg-[#F8FAFC]">
-              <div className="flex items-center space-x-2 text-[#0F172A] font-bold mb-2">
-                <QrCode className="w-4 h-4 text-[#4F46E5]" />
-                <span>Unguessable QR Tokens</span>
-              </div>
-              <p className="leading-relaxed">
-                Dynamic 32-character tokens resolve shops and branches server-side without exposing internal auto-increment database IDs to untrusted browsers.
-              </p>
-            </div>
-
-            <div className="border border-[#F1F5F9] rounded-xl p-4 bg-[#F8FAFC]">
-              <div className="flex items-center space-x-2 text-[#0F172A] font-bold mb-2">
-                <Printer className="w-4 h-4 text-[#4F46E5]" />
-                <span>One-Time Device Pairing</span>
-              </div>
-              <p className="leading-relaxed">
-                Short-lived pairing codes (e.g. <code>PRNT-XXXX-XX</code>) lock Windows Electron clients to physical branches, issuing persistent SHA-256 hashed device tokens.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Portals Overview */}
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-bold text-[#0F172A]">PrintEase Platform Portals</h2>
-            <p className="text-xs text-[#64748B]">All 4 application surfaces scaffolded under the unified Stitch Design System</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Customer Portal */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-[#CBD5E1] transition-all flex flex-col justify-between group">
-              <div>
-                <div className="w-10 h-10 rounded-lg bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center mb-4">
-                  <QrCode className="w-5 h-5" />
-                </div>
-                <h3 className="font-bold text-base text-[#0F172A] mb-1">Customer Self-Service</h3>
-                <p className="text-xs text-[#64748B] leading-relaxed mb-4">
-                  Zero-install mobile and desktop web interface. Scan QR, upload PDF, configure duplex/color/copies, pay online, and monitor print progress.
-                </p>
-              </div>
-              <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs font-semibold text-[#4F46E5]">
-                <span>Phase 3 Target</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-
-            {/* Shop Owner Portal */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-[#CBD5E1] transition-all flex flex-col justify-between group">
-              <div>
-                <div className="w-10 h-10 rounded-lg bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center mb-4">
-                  <LayoutDashboard className="w-5 h-5" />
-                </div>
-                <h3 className="font-bold text-base text-[#0F172A] mb-1">Shop Owner Dashboard</h3>
-                <p className="text-xs text-[#64748B] leading-relaxed mb-4">
-                  Fleet and branch control, pricing matrix engine, live print queue spooler, earnings telemetry, and team management based on Stitch design.
-                </p>
-              </div>
-              <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs font-semibold text-[#4F46E5]">
-                <span>Phase 6 Target</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-
-            {/* Desktop Spooler Engine */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-[#CBD5E1] transition-all flex flex-col justify-between group">
-              <div>
-                <div className="w-10 h-10 rounded-lg bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center mb-4">
-                  <Printer className="w-5 h-5" />
-                </div>
-                <h3 className="font-bold text-base text-[#0F172A] mb-1">Windows Desktop Agent</h3>
-                <p className="text-xs text-[#64748B] leading-relaxed mb-4">
-                  Electron Windows client with secure device pairing, native Windows printer enumeration, idempotent job polling, and spooler submission.
-                </p>
-              </div>
-              <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs font-semibold text-[#4F46E5]">
-                <span>Phase 5 Target</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </div>
-        </section>
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-[#E2E8F0] py-6 text-center text-xs text-[#64748B]">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0">
-          <span>PrintEase Autonomous Multi-Shop QR Printing SaaS • Phase 2 Verified</span>
-          <div className="flex items-center space-x-4">
-            <span>PHP 8.3.36</span>
-            <span>•</span>
-            <span>Laravel 11</span>
-            <span>•</span>
-            <span>MySQL 8.4</span>
-            <span>•</span>
-            <span>React 19</span>
-            <span>•</span>
-            <span>Electron</span>
-          </div>
-        </div>
-      </footer>
+      {/* Pairing Helper Modal */}
+      <PairingHelperModal 
+        isOpen={showPairingModal} 
+        onClose={() => setShowPairingModal(false)} 
+      />
     </div>
   );
 }
-
 export default App;
