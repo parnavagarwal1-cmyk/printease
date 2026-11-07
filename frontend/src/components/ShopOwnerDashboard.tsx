@@ -32,8 +32,8 @@ export const ShopOwnerDashboard: React.FC = () => {
   const [user, setUser] = useState<any | null>(null);
   
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('owner@metroprint.com');
-  const [loginPassword, setLoginPassword] = useState('Secret@12345');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -787,12 +787,6 @@ export const ShopOwnerDashboard: React.FC = () => {
         {/* MODE 1: Login Form */}
         {authMode === 'login' ? (
           <form onSubmit={handleLogin} className="p-6 space-y-4">
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs text-indigo-900">
-              <strong>Pre-Filled Test Credentials:</strong>
-              <p className="mt-0.5">Email: <code>owner@metroprint.com</code></p>
-              <p>Password: <code>Secret@12345</code></p>
-            </div>
-
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-700">Email Address</label>
               <input
@@ -1702,7 +1696,7 @@ export const ShopOwnerDashboard: React.FC = () => {
                     <h4 className="font-bold text-xs text-slate-900">Customer Mobile Terminal Preview</h4>
                   </div>
                   <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                    Live Demo
+                    Live Preview
                   </span>
                 </div>
 
@@ -1724,7 +1718,7 @@ export const ShopOwnerDashboard: React.FC = () => {
                   <div className="inline-block p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm">
                     <img
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(
-                        `upi://pay?pa=${merchantVpa || 'merchant@upi'}&pn=${encodeURIComponent(merchantName || 'Shop')}&am=10.00&cu=INR&tn=PrintEase Order Test`
+                        `upi://pay?pa=${merchantVpa || 'merchant@upi'}&pn=${encodeURIComponent(merchantName || 'Shop')}&am=10.00&cu=INR&tn=PrintEase Order Payment`
                       )}`}
                       alt="UPI QR Code Preview"
                       className="w-32 h-32 mx-auto"

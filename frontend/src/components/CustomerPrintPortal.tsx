@@ -340,44 +340,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
         return;
       }
 
-      // Fallback test simulation
-      const rzpPaymentId = `pay_test_${Math.floor(100000 + Math.random() * 900000)}`;
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode('mock_secret_key_67890');
-      const cryptoKey = await window.crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-      );
-      const signatureBuffer = await window.crypto.subtle.sign(
-        'HMAC',
-        cryptoKey,
-        encoder.encode(`${rzpOrderId}|${rzpPaymentId}`)
-      );
-      const signatureHex = Array.from(new Uint8Array(signatureBuffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-
-      const verifyRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/verify-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          razorpay_order_id: rzpOrderId,
-          razorpay_payment_id: rzpPaymentId,
-          razorpay_signature: signatureHex,
-        }),
-      });
-
-      if (!verifyRes.ok) {
-        const vErr = await verifyRes.json().catch(() => ({}));
-        throw new Error(vErr.message || 'Payment verification rejected.');
-      }
-
-      const vData = await verifyRes.json();
-      setPaymentSuccess(true);
-      setCreatedOrder(vData.order);
+      throw new Error('Online card gateway is currently unavailable. Please scan the Shop Soundbox / UPI QR above to pay directly.');
     } catch (err: any) {
       setPaymentError(err.message || 'Payment processing failed.');
     } finally {
