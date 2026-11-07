@@ -67,6 +67,9 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   const [paying, setPaying] = useState<boolean>(false);
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'soundbox' | 'razorpay'>('soundbox');
+  const [upiData, setUpiData] = useState<any>(null);
+  const [confirmingSoundbox, setConfirmingSoundbox] = useState<boolean>(false);
 
   // 1. Resolve Branch Details from QR Token
   const resolveBranch = useCallback(async (token: string) => {
@@ -222,6 +225,12 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       setCreatedOrder(resData.order);
       setPaymentSuccess(false);
       setPaymentError(null);
+
+      // Load dynamic Soundbox UPI payload
+      fetch(`/api/public/orders/${encodeURIComponent(resData.order.order_number)}/upi-qr`)
+        .then(r => r.json())
+        .then(d => { if (d.upi) setUpiData(d.upi); })
+        .catch(console.error);
     } catch (err: any) {
       setOrderError(err.message || 'Failed to place order.');
     } finally {
@@ -361,6 +370,57 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       navigator.clipboard.writeText(createdOrder.order_number);
       setCopiedOrderNumber(true);
       setTimeout(() => setCopiedOrderNumber(false), 2000);
+    }
+  };
+
+  // Poll order status to automatically catch Soundbox payments within 2.5 seconds
+  useEffect(() => {
+    if (!createdOrder || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED' || paymentSuccess) {
+      return;
+    }
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.order && (data.order.status === 'PRINT_QUEUED' || data.order.status === 'COMPLETED' || data.order.status === 'PRINTING')) {
+            setPaymentSuccess(true);
+            setCreatedOrder(data.order);
+          }
+        }
+      } catch (err) {
+        // ignore background poll errors
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [createdOrder, paymentSuccess]);
+
+  // Handle instant soundbox simulation / confirmation
+  const handleConfirmSoundboxPaid = async () => {
+    if (!createdOrder) return;
+    setConfirmingSoundbox(true);
+    setPaymentError(null);
+    try {
+      const res = await fetch('/api/webhooks/soundbox/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_number: createdOrder.order_number,
+          provider: upiData?.soundbox_provider || 'paytm',
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || 'Soundbox confirmation failed.');
+      }
+      const data = await res.json();
+      setPaymentSuccess(true);
+      setCreatedOrder(data.order);
+    } catch (err: any) {
+      setPaymentError(err.message || 'Soundbox confirmation failed.');
+    } finally {
+      setConfirmingSoundbox(false);
     }
   };
 
@@ -527,27 +587,141 @@ export const CustomerPrintPortal: React.FC<Props> = ({
           )}
 
           {!(paymentSuccess || createdOrder.status === 'PRINT_QUEUED') ? (
-            <div className="max-w-md mx-auto space-y-3">
-              <button
-                onClick={handlePayNow}
-                disabled={paying}
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-              >
-                {paying ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Verifying HMAC-SHA256 Signature...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Pay with Razorpay Test Mode (₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)})</span>
-                  </>
-                )}
-              </button>
-              <p className="text-[11px] text-slate-400">
-                Safe test mode transaction simulation. No real money will be charged.
-              </p>
+            <div className="max-w-md mx-auto space-y-4">
+              {/* Payment Method Selector */}
+              <div className="flex bg-slate-200/80 p-1 rounded-xl text-xs font-bold text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('soundbox')}
+                  className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    paymentMethod === 'soundbox' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
+                  }`}
+                >
+                  <span>🔊 Shop Soundbox / UPI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('razorpay')}
+                  className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    paymentMethod === 'razorpay' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
+                  }`}
+                >
+                  <span>💳 Card / Gateway</span>
+                </button>
+              </div>
+
+              {/* METHOD 1: Soundbox / Direct UPI QR */}
+              {paymentMethod === 'soundbox' && (
+                <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-sm text-center space-y-3">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
+                      {upiData?.soundbox_provider === 'phonepe' ? 'PhonePe Soundbox' : 'Paytm Soundbox'} Active
+                    </span>
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      Scan to Pay ₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)}
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Payee: <strong className="text-slate-700">{upiData?.merchant_name || 'Metro Print Solutions'}</strong> ({upiData?.merchant_vpa || 'metroprint@paytm'})
+                    </p>
+                  </div>
+
+                  {/* QR Code Container */}
+                  <div className="inline-block p-3 bg-white rounded-2xl border-2 border-slate-200 shadow-inner">
+                    {upiData?.qr_code_url ? (
+                      <img
+                        src={upiData.qr_code_url}
+                        alt="UPI Payment QR Code"
+                        className="w-44 h-44 mx-auto object-contain"
+                      />
+                    ) : (
+                      <div className="w-44 h-44 flex items-center justify-center text-xs text-slate-400">
+                        Generating Dynamic UPI QR...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile 1-Tap App Deep Links */}
+                  {upiData?.app_intents && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-medium text-slate-500">Or tap to open your UPI app on mobile:</p>
+                      <div className="flex justify-center gap-2">
+                        <a
+                          href={upiData.app_intents.gpay}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-colors"
+                        >
+                          Google Pay
+                        </a>
+                        <a
+                          href={upiData.app_intents.phonepe}
+                          className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          PhonePe
+                        </a>
+                        <a
+                          href={upiData.app_intents.paytm}
+                          className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          Paytm
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Soundbox Notice Box */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left flex items-start gap-2">
+                    <span className="text-base">🔊</span>
+                    <div className="text-[11px] text-amber-900 leading-tight">
+                      <strong>Auto-Print on Soundbox Voice:</strong> When your shop's Soundbox speaks <em>"₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)} prapt hue"</em>, your document prints automatically!
+                    </div>
+                  </div>
+
+                  {/* Manual Soundbox Confirm Button */}
+                  <button
+                    type="button"
+                    onClick={handleConfirmSoundboxPaid}
+                    disabled={confirmingSoundbox}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {confirmingSoundbox ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Confirming Soundbox Payment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Soundbox Confirmed? Click to Release Print</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* METHOD 2: Razorpay Gateway */}
+              {paymentMethod === 'razorpay' && (
+                <div className="space-y-3">
+                  <button
+                    onClick={handlePayNow}
+                    disabled={paying}
+                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {paying ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Processing Payment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Pay via Cards / NetBanking / Razorpay</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-slate-400">
+                    Supports Debit/Credit Cards, NetBanking, and Gateway UPI.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="max-w-md mx-auto bg-emerald-50/80 border border-emerald-200 rounded-xl p-4 text-left space-y-2">

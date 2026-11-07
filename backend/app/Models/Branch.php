@@ -18,6 +18,9 @@ class Branch extends Model
         'state',
         'pincode',
         'phone',
+        'merchant_vpa',
+        'merchant_name',
+        'soundbox_provider',
         'is_active',
     ];
 

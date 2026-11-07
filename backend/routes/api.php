@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\DesktopJobController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PublicOrderController;
 use App\Http\Controllers\Api\ShopController;
+use App\Http\Controllers\Api\SoundboxWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -93,10 +94,14 @@ Route::prefix('public')->group(function () {
     // Payment Endpoints
     Route::post('/orders/{orderNumber}/pay', [PaymentController::class, 'initiatePayment']);
     Route::post('/orders/{orderNumber}/verify-payment', [PaymentController::class, 'verifyPayment']);
+    Route::get('/orders/{orderNumber}/upi-qr', [SoundboxWebhookController::class, 'getUpiQr']);
 });
 
-// --- Public Webhooks (Razorpay) ---
+// --- Public Webhooks (Razorpay & Soundboxes) ---
 Route::post('/webhooks/razorpay', [PaymentController::class, 'handleWebhook']);
+Route::post('/webhooks/paytm', [SoundboxWebhookController::class, 'handlePaytmWebhook']);
+Route::post('/webhooks/phonepe', [SoundboxWebhookController::class, 'handlePhonePeWebhook']);
+Route::post('/webhooks/soundbox/simulate', [SoundboxWebhookController::class, 'simulateWebhook']);
 
 // --- Authenticated Tenant Endpoints (Sanctum) ---
 Route::middleware('auth:sanctum')->group(function () {
