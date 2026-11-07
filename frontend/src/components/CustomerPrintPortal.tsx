@@ -455,8 +455,8 @@ export const CustomerPrintPortal: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Main Flow: If Order Placed Show Payment / Success Receipt */}
-      {createdOrder ? (
+      {/* Main Flow: Only render once branch is verified */}
+      {branchData && (createdOrder ? (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 sm:p-8 text-center space-y-6">
           <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center shadow-inner">
             {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED' ? (
@@ -1085,7 +1085,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
             </form>
           )}
         </div>
-      )}
+      ))}
     </div>
   );
 };
