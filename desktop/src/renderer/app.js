@@ -67,16 +67,22 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-pair').addEventListener('click', async () => {
+    const backendInput = document.getElementById('input-backend-url');
     const input = document.getElementById('input-pairing-code');
     const resultBox = document.getElementById('pairing-result');
     const code = input.value.trim();
+    const backendUrl = (backendInput ? backendInput.value.trim() : '') || 'http://127.0.0.1:8000';
 
     if (!code) {
       resultBox.innerHTML = '<span style="color:#EF4444; font-size:12px;">Please enter a pairing code.</span>';
       return;
     }
 
-    resultBox.innerHTML = '<span style="color:#64748B; font-size:12px;">Connecting to PrintEase cloud...</span>';
+    resultBox.innerHTML = '<span style="color:#64748B; font-size:12px;">Connecting to PrintEase cloud (' + escapeHtml(backendUrl) + ')...</span>';
+    
+    // Save backend URL into device config
+    await window.electronAPI.saveDeviceConfig({ backendUrl });
+
     const res = await window.electronAPI.pairDevice(code);
     if (res.success) {
       resultBox.innerHTML = `<span style="color:#10B981; font-weight:600; font-size:12px;">✓ ${res.message}</span>`;
@@ -98,6 +104,12 @@ async function loadAppInfo() {
     document.getElementById('info-electron').textContent = info.electron;
     document.getElementById('info-node').textContent = info.node;
     document.getElementById('info-platform').textContent = `${info.platform} (${info.arch})`;
+
+    const config = await window.electronAPI.getDeviceConfig();
+    const backendInput = document.getElementById('input-backend-url');
+    if (backendInput && config && config.backendUrl) {
+      backendInput.value = config.backendUrl;
+    }
   } catch (err) {
     console.error('Failed to get app version:', err);
   }
@@ -113,7 +125,9 @@ async function refreshBackendStatus() {
   valBackendStatus.textContent = 'Testing...';
 
   try {
-    const health = await window.electronAPI.checkHealth('http://127.0.0.1:8000');
+    const config = await window.electronAPI.getDeviceConfig();
+    const targetUrl = (config && config.backendUrl) ? config.backendUrl : 'http://127.0.0.1:8000';
+    const health = await window.electronAPI.checkHealth(targetUrl);
     if (health.ok && health.data) {
       sidebarBadge.innerHTML = '<span class="status-dot online"></span><span class="status-label" style="color:#065F46; font-weight:600;">Cloud Online</span>';
       valBackendStatus.textContent = 'Connected';
