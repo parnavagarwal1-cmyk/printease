@@ -250,9 +250,68 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
       const initData = await initRes.json();
       const rzpOrderId = initData.razorpay.razorpay_order_id;
+      const isMock = !initData.razorpay?.key_id || initData.razorpay.key_id.includes('mock');
+
+      // If real Razorpay key is configured and Razorpay JS SDK is loaded, open official Razorpay Checkout
+      if (!isMock && typeof (window as any).Razorpay !== 'undefined') {
+        const options = {
+          key: initData.razorpay.key_id,
+          amount: initData.razorpay.amount,
+          currency: initData.razorpay.currency || 'INR',
+          name: branchData?.shop?.name || 'PrintEase',
+          description: `Print Order #${createdOrder.order_number}`,
+          order_id: rzpOrderId,
+          handler: async function (response: any) {
+            try {
+              // Verify Payment on Backend
+              const verifyRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/verify-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
+              });
+
+              if (!verifyRes.ok) {
+                const vErr = await verifyRes.json().catch(() => ({}));
+                throw new Error(vErr.message || 'Payment verification rejected.');
+              }
+
+              const vData = await verifyRes.json();
+              setPaymentSuccess(true);
+              setCreatedOrder(vData.order);
+            } catch (vErr: any) {
+              setPaymentError(vErr.message || 'Payment verification failed.');
+            } finally {
+              setPaying(false);
+            }
+          },
+          prefill: {
+            name: createdOrder.customer_name,
+            contact: createdOrder.customer_phone,
+            email: createdOrder.customer_email || '',
+          },
+          theme: {
+            color: '#4F46E5',
+          },
+          modal: {
+            ondismiss: function () {
+              setPaying(false);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+        return; // Wait for modal completion
+      }
+
+      // Fallback: Mock Test Mode Simulation
       const rzpPaymentId = `pay_test_${Math.floor(100000 + Math.random() * 900000)}`;
 
-      // Step B: Calculate mock signature via Web Crypto API with test secret "mock_secret_key_67890"
+      // Calculate mock signature via Web Crypto API with test secret "mock_secret_key_67890"
       const encoder = new TextEncoder();
       const keyData = encoder.encode('mock_secret_key_67890');
       const cryptoKey = await window.crypto.subtle.importKey(
@@ -271,7 +330,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
 
-      // Step C: Verify Payment
+      // Verify Payment on Backend
       const verifyRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/verify-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
