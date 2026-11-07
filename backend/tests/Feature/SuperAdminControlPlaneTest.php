@@ -211,4 +211,25 @@ class SuperAdminControlPlaneTest extends TestCase
         $response = $this->deleteJson("/api/admin/shops/{$this->shop->id}");
         $response->assertStatus(403);
     }
+
+    public function test_super_admin_can_update_email_and_password(): void
+    {
+        Sanctum::actingAs($this->superAdmin);
+
+        $response = $this->putJson('/api/admin/profile', [
+            'name' => 'Chief Admin',
+            'email' => 'newadmin@printease.com',
+            'new_password' => 'NewSecretPassword123!',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('user.email', 'newadmin@printease.com')
+            ->assertJsonPath('user.name', 'Chief Admin');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $this->superAdmin->id,
+            'email' => 'newadmin@printease.com',
+            'name' => 'Chief Admin',
+        ]);
+    }
 }

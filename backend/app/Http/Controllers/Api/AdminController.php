@@ -15,6 +15,7 @@ use App\Models\Subscription;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
@@ -194,5 +195,62 @@ class AdminController extends Controller
     {
         $plans = Plan::where('is_active', true)->orderBy('monthly_price', 'asc')->get();
         return response()->json(['plans' => $plans]);
+    }
+
+    /**
+     * Update Super Admin profile & credentials.
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->isSuperAdmin()) {
+            return response()->json(['message' => 'Forbidden: Super admin access required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'email' => ['sometimes', 'required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'current_password' => ['nullable', 'string'],
+            'new_password' => ['nullable', 'string', 'min:8'],
+        ]);
+
+        if (!empty($validated['new_password'])) {
+            if (!empty($validated['current_password'])) {
+                if (!Hash::check($validated['current_password'], $user->password)) {
+                    return response()->json(['message' => 'Current password does not match.'], 422);
+                }
+            }
+            $user->password = $validated['new_password'];
+        }
+
+        if (isset($validated['name'])) {
+            $user->name = $validated['name'];
+        }
+
+        if (isset($validated['email'])) {
+            $user->email = strtolower(trim($validated['email']));
+        }
+
+        $user->save();
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'shop_id' => null,
+            'action' => 'admin_credentials_updated',
+            'entity_type' => 'user',
+            'entity_id' => $user->id,
+            'ip_address' => $request->ip(),
+            'details' => ['updated_email' => $user->email],
+        ]);
+
+        return response()->json([
+            'message' => 'Admin profile and credentials updated successfully.',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+            ],
+        ]);
     }
 }

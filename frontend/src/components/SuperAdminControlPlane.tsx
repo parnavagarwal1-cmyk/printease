@@ -9,7 +9,9 @@ import {
   LogIn, 
   LogOut, 
   Layers,
-  Trash2
+  Trash2,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 
 export const SuperAdminControlPlane: React.FC = () => {
@@ -28,7 +30,16 @@ export const SuperAdminControlPlane: React.FC = () => {
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'shops' | 'audit' | 'plans'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'shops' | 'audit' | 'plans' | 'security'>('overview');
+
+  // Admin Profile & Security state
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminCurrentPassword, setAdminCurrentPassword] = useState('');
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   // Verify and fetch user
   const fetchAdminUser = useCallback(async (authToken: string) => {
@@ -40,6 +51,8 @@ export const SuperAdminControlPlane: React.FC = () => {
         const data = await res.json();
         if (data.user.role === 'super_admin') {
           setUser(data.user);
+          setAdminName(data.user.name || '');
+          setAdminEmail(data.user.email || '');
         } else {
           setLoginError('You do not have super admin privileges.');
           localStorage.removeItem('printease_admin_token');
@@ -120,6 +133,8 @@ export const SuperAdminControlPlane: React.FC = () => {
       localStorage.setItem('printease_admin_token', data.token);
       setToken(data.token);
       setUser(data.user);
+      setAdminName(data.user.name || '');
+      setAdminEmail(data.user.email || '');
     } catch (err: any) {
       setLoginError(err.message || 'Login failed.');
     } finally {
@@ -180,6 +195,52 @@ export const SuperAdminControlPlane: React.FC = () => {
       }
     } catch (err) {
       console.error('Delete shop error:', err);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+
+    try {
+      const payload: any = {
+        name: adminName,
+        email: adminEmail,
+      };
+      if (adminNewPassword) {
+        payload.new_password = adminNewPassword;
+        if (adminCurrentPassword) {
+          payload.current_password = adminCurrentPassword;
+        }
+      }
+
+      const res = await fetch('/api/admin/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to update admin profile');
+      }
+
+      setUser(data.user);
+      setAdminCurrentPassword('');
+      setAdminNewPassword('');
+      setProfileSuccess(data.message || 'Super Admin credentials updated successfully!');
+      setTimeout(() => setProfileSuccess(null), 4000);
+    } catch (err: any) {
+      setProfileError(err.message || 'Error updating credentials');
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -362,6 +423,16 @@ export const SuperAdminControlPlane: React.FC = () => {
         >
           SaaS Plans & Quotas
         </button>
+
+        <button
+          onClick={() => setActiveTab('security')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'security' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Lock className="w-3.5 h-3.5" />
+          <span>Security & Login</span>
+        </button>
       </div>
 
       {/* Tab 1: Overview */}
@@ -536,6 +607,105 @@ export const SuperAdminControlPlane: React.FC = () => {
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Tab 5: Admin Security & Credentials */}
+      {activeTab === 'security' && (
+        <div className="max-w-2xl bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
+          <div className="border-b border-slate-100 pb-4">
+            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+              <Lock className="w-5 h-5 text-indigo-600" />
+              <span>Super Administrator Credentials</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Update your root Super Admin email address, display name, and password for PrintEase.
+            </p>
+          </div>
+
+          {profileSuccess && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-semibold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{profileSuccess}</span>
+            </div>
+          )}
+
+          {profileError && (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-700 text-xs font-semibold">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{profileError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Admin Name</label>
+                <input
+                  type="text"
+                  required
+                  value={adminName}
+                  onChange={e => setAdminName(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  placeholder="Super Admin Name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Admin Email</label>
+                <input
+                  type="email"
+                  required
+                  value={adminEmail}
+                  onChange={e => setAdminEmail(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-mono"
+                  placeholder="admin@yourdomain.com"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                <span>Change Password (Leave blank to keep unchanged)</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Current Password</label>
+                  <input
+                    type="password"
+                    value={adminCurrentPassword}
+                    onChange={e => setAdminCurrentPassword(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-mono"
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">New Password</label>
+                  <input
+                    type="password"
+                    value={adminNewPassword}
+                    onChange={e => setAdminNewPassword(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-mono"
+                    placeholder="Min 8 characters"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={profileLoading}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {profileLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                <span>Save & Update Credentials</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
