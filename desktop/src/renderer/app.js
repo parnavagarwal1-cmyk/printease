@@ -71,7 +71,7 @@ function setupEventListeners() {
     const input = document.getElementById('input-pairing-code');
     const resultBox = document.getElementById('pairing-result');
     const code = input.value.trim();
-    const backendUrl = (backendInput ? backendInput.value.trim() : '') || 'http://127.0.0.1:8000';
+    const backendUrl = (backendInput ? backendInput.value.trim() : '') || 'https://printease-production-7b9f.up.railway.app';
 
     if (!code) {
       resultBox.innerHTML = '<span style="color:#EF4444; font-size:12px;">Please enter a pairing code.</span>';
@@ -110,6 +110,22 @@ async function loadAppInfo() {
     if (backendInput && config && config.backendUrl) {
       backendInput.value = config.backendUrl;
     }
+    const valBackendSub = document.getElementById('val-backend-sub');
+    if (valBackendSub && config && config.backendUrl) {
+      valBackendSub.textContent = config.backendUrl;
+    }
+    if (config && config.paired) {
+      const stateEl = document.getElementById('val-device-state');
+      const subEl = document.getElementById('val-device-sub');
+      const infoBranch = document.getElementById('info-branch');
+      if (stateEl) {
+        stateEl.textContent = 'Paired & Online';
+        stateEl.style.color = '#10B981';
+      }
+      const branchDisplay = config.branchName ? `${config.branchName} (${config.shopName || 'Shop'})` : 'Active';
+      if (subEl) subEl.textContent = branchDisplay;
+      if (infoBranch) infoBranch.textContent = branchDisplay;
+    }
   } catch (err) {
     console.error('Failed to get app version:', err);
   }
@@ -126,7 +142,11 @@ async function refreshBackendStatus() {
 
   try {
     const config = await window.electronAPI.getDeviceConfig();
-    const targetUrl = (config && config.backendUrl) ? config.backendUrl : 'http://127.0.0.1:8000';
+    const targetUrl = (config && config.backendUrl) ? config.backendUrl : 'https://printease-production-7b9f.up.railway.app';
+    const valBackendSub = document.getElementById('val-backend-sub');
+    if (valBackendSub) {
+      valBackendSub.textContent = targetUrl;
+    }
     const health = await window.electronAPI.checkHealth(targetUrl);
     if (health.ok && health.data) {
       sidebarBadge.innerHTML = '<span class="status-dot online"></span><span class="status-label" style="color:#065F46; font-weight:600;">Cloud Online</span>';

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { WindowsPrinterAdapter } = require('./adapters/printerAdapter');
 const { PrintWorker } = require('./worker/printWorker');
 
@@ -8,8 +9,8 @@ let printerAdapter = null;
 let printWorker = null;
 const recentJobs = [];
 
-let deviceConfig = {
-  backendUrl: 'http://127.0.0.1:8000',
+const defaultConfig = {
+  backendUrl: 'https://printease-production-7b9f.up.railway.app',
   paired: false,
   deviceToken: null,
   deviceUuid: 'win-agent-' + Math.random().toString(36).substring(2, 10),
@@ -19,6 +20,41 @@ let deviceConfig = {
   selectedPrinter: null,
   pollIntervalMs: 5000
 };
+
+let deviceConfig = { ...defaultConfig };
+
+function getConfigFilePath() {
+  try {
+    return path.join(app.getPath('userData'), 'device-config.json');
+  } catch {
+    return path.join(__dirname, '..', 'device-config.json');
+  }
+}
+
+function loadPersistedConfig() {
+  try {
+    const filePath = getConfigFilePath();
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      deviceConfig = { ...defaultConfig, ...data };
+      console.log('[PrintEase] Loaded persisted config from:', filePath);
+      return;
+    }
+  } catch (err) {
+    console.error('[PrintEase] Error loading persisted config:', err);
+  }
+  deviceConfig = { ...defaultConfig };
+}
+
+function savePersistedConfig(cfg) {
+  try {
+    const filePath = getConfigFilePath();
+    fs.writeFileSync(filePath, JSON.stringify(cfg, null, 2), 'utf8');
+    console.log('[PrintEase] Saved config to:', filePath);
+  } catch (err) {
+    console.error('[PrintEase] Error saving config:', err);
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -67,6 +103,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  loadPersistedConfig();
   createWindow();
 
   app.on('activate', () => {
@@ -135,6 +172,7 @@ ipcMain.handle('device:config', () => {
 
 ipcMain.handle('device:saveConfig', (event, newConfig) => {
   deviceConfig = { ...deviceConfig, ...newConfig };
+  savePersistedConfig(deviceConfig);
   return { success: true, config: deviceConfig };
 });
 
@@ -172,6 +210,7 @@ ipcMain.handle('device:pair', async (event, pairingCode) => {
     deviceConfig.branchId = data.branch.id;
     deviceConfig.branchName = data.branch.name;
     deviceConfig.shopName = data.branch.shop_name;
+    savePersistedConfig(deviceConfig);
 
     // Start background print polling worker
     if (printWorker) {
