@@ -1001,18 +1001,6 @@ export const ShopOwnerDashboard: React.FC = () => {
           )}
 
           <button
-            onClick={() => {
-              setShowAddBranchModal(true);
-              setCreateBranchError(null);
-            }}
-            className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Add another counter or branch"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Branch</span>
-          </button>
-
-          <button
             onClick={fetchBranchData}
             disabled={loading}
             className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
