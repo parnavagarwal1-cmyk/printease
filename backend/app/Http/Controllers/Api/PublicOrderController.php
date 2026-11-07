@@ -30,10 +30,22 @@ class PublicOrderController extends Controller
      */
     public function resolveQr(string $token): JsonResponse
     {
-        $qrCode = QrCode::where('token', $token)
-            ->where('is_active', true)
-            ->with(['branch.shop', 'branch.pricingRules', 'branch.printers'])
-            ->first();
+        $qrCode = null;
+
+        if ($token === 'default' || $token === 'auto' || $token === 'latest' || empty($token)) {
+            $qrCode = QrCode::where('is_active', true)
+                ->whereHas('branch', function ($b) {
+                    $b->where('is_active', true);
+                })
+                ->with(['branch.shop', 'branch.pricingRules', 'branch.printers'])
+                ->latest('id')
+                ->first();
+        } else {
+            $qrCode = QrCode::where('token', $token)
+                ->where('is_active', true)
+                ->with(['branch.shop', 'branch.pricingRules', 'branch.printers'])
+                ->first();
+        }
 
         if (!$qrCode || !$qrCode->branch || !$qrCode->branch->is_active) {
             return response()->json([
@@ -367,10 +379,22 @@ class PublicOrderController extends Controller
      */
     private function resolveBranchFromToken(string $token): ?Branch
     {
-        $qrCode = QrCode::where('token', $token)
-            ->where('is_active', true)
-            ->with(['branch.shop', 'branch.pricingRules'])
-            ->first();
+        $qrCode = null;
+
+        if ($token === 'default' || $token === 'auto' || $token === 'latest' || empty($token)) {
+            $qrCode = QrCode::where('is_active', true)
+                ->whereHas('branch', function ($b) {
+                    $b->where('is_active', true);
+                })
+                ->with(['branch.shop', 'branch.pricingRules'])
+                ->latest('id')
+                ->first();
+        } else {
+            $qrCode = QrCode::where('token', $token)
+                ->where('is_active', true)
+                ->with(['branch.shop', 'branch.pricingRules'])
+                ->first();
+        }
 
         return ($qrCode && $qrCode->branch && $qrCode->branch->is_active)
             ? $qrCode->branch

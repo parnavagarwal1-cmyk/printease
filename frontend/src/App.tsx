@@ -96,7 +96,7 @@ export function App() {
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {activeTab === 'customer' ? (
           <CustomerPrintPortal 
-            defaultQrToken={initialQr || "pe_demo_connaught_branch_token_99"} 
+            defaultQrToken={initialQr || "pe_wJI5xrkcQve5Sum5PJEceqlgvfIzXv8W"} 
             onOpenPairingInfo={() => setShowPairingModal(true)}
           />
         ) : activeTab === 'dashboard' ? (

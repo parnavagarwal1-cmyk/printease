@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FileText, 
-  Upload, 
-  CheckCircle, 
+  UploadCloud, 
+  CheckCircle2, 
   AlertCircle, 
   RefreshCw, 
   CreditCard, 
   Printer, 
   Copy, 
   Check, 
-  Sparkles, 
   ShieldCheck, 
-  CheckCircle2 
+  Store, 
+  MapPin, 
+  Layers, 
+  Palette, 
+  Volume2, 
+  ArrowRight, 
+  RotateCcw 
 } from 'lucide-react';
 import type { 
   QrResolutionResponse, 
@@ -26,10 +31,9 @@ interface Props {
 }
 
 export const CustomerPrintPortal: React.FC<Props> = ({ 
-  defaultQrToken = 'pe_demo_connaught_branch_token_99',
-  onOpenPairingInfo
+  defaultQrToken = 'default'
 }) => {
-  const [qrToken, setQrToken] = useState<string>(defaultQrToken);
+  const [qrToken, setQrToken] = useState<string>(defaultQrToken || 'default');
   const [branchData, setBranchData] = useState<QrResolutionResponse | null>(null);
   const [loadingBranch, setLoadingBranch] = useState<boolean>(true);
   const [branchError, setBranchError] = useState<string | null>(null);
@@ -52,9 +56,8 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   const [calculating, setCalculating] = useState<boolean>(false);
 
   // Customer contact state
-  const [customerName, setCustomerName] = useState<string>('Rahul Verma');
-  const [customerPhone, setCustomerPhone] = useState<string>('+919876543210');
-  const [customerEmail, setCustomerEmail] = useState<string>('rahul@example.com');
+  const [customerName, setCustomerName] = useState<string>('');
+  const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerNotes, setCustomerNotes] = useState<string>('');
 
   // Order submission state
@@ -70,17 +73,21 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   const [paymentMethod, setPaymentMethod] = useState<'soundbox' | 'razorpay'>('soundbox');
   const [upiData, setUpiData] = useState<any>(null);
 
-  // 1. Resolve Branch Details from QR Token
+  // 1. Resolve Branch Details automatically from QR Token
   const resolveBranch = useCallback(async (token: string) => {
     setLoadingBranch(true);
     setBranchError(null);
     try {
-      const res = await fetch(`/api/public/qr/${encodeURIComponent(token.trim())}`);
+      const cleanToken = token.trim() || 'default';
+      const res = await fetch(`/api/public/qr/${encodeURIComponent(cleanToken)}`);
       if (!res.ok) {
-        throw new Error(`Invalid or inactive QR code (${res.status})`);
+        throw new Error(`Unable to load counter details (${res.status}). Please scan the counter QR again.`);
       }
       const data: QrResolutionResponse = await res.json();
       setBranchData(data);
+      if (data.qr_token && data.qr_token !== qrToken) {
+        setQrToken(data.qr_token);
+      }
       const defaultSize = data.branch?.default_paper_size || 'A4';
       const activeRules = (data.pricing_rules || []).filter((r: any) => r.is_active !== false);
       if (activeRules.some((r: any) => r.paper_size.toUpperCase() === defaultSize.toUpperCase())) {
@@ -96,7 +103,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     } finally {
       setLoadingBranch(false);
     }
-  }, []);
+  }, [qrToken]);
 
   useEffect(() => {
     if (defaultQrToken && defaultQrToken !== qrToken) {
@@ -105,10 +112,15 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   }, [defaultQrToken]);
 
   useEffect(() => {
-    if (qrToken) {
-      resolveBranch(qrToken);
-    }
+    resolveBranch(qrToken);
   }, [qrToken, resolveBranch]);
+
+  // Pricing helper for selected paper size
+  const currentPricingRule = branchData?.pricing_rules?.find(
+    (r: any) => r.paper_size.toUpperCase() === paperSize.toUpperCase() && r.is_active !== false
+  );
+  const bwPriceDisplay = currentPricingRule ? `₹${parseFloat(String(currentPricingRule.bw_single_price)).toFixed(2)}` : '₹2.00';
+  const colorPriceDisplay = currentPricingRule ? `₹${parseFloat(String(currentPricingRule.color_single_price)).toFixed(2)}` : '₹10.00';
 
   // 2. Handle File Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +139,8 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     formData.append('file', file);
 
     try {
-      const res = await fetch(`/api/public/qr/${encodeURIComponent(qrToken)}/upload`, {
+      const activeToken = branchData?.qr_token || qrToken || 'default';
+      const res = await fetch(`/api/public/qr/${encodeURIComponent(activeToken)}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -140,7 +153,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       const data = await res.json();
       setUploadedFile(data.file);
     } catch (err: any) {
-      setUploadError(err.message || 'Error uploading file.');
+      setUploadError(err.message || 'Error uploading file. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -154,7 +167,8 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       setCalculating(true);
       try {
         const range = pageRangeMode === 'custom' ? customPageRange : 'all';
-        const res = await fetch(`/api/public/qr/${encodeURIComponent(qrToken)}/estimate`, {
+        const activeToken = branchData.qr_token || qrToken || 'default';
+        const res = await fetch(`/api/public/qr/${encodeURIComponent(activeToken)}/estimate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -196,10 +210,10 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     try {
       const range = pageRangeMode === 'custom' ? customPageRange : 'all';
       const payload = {
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_email: customerEmail || null,
-        notes: customerNotes || null,
+        customer_name: customerName.trim() || 'Counter Customer',
+        customer_phone: customerPhone.trim() || '9876543210',
+        customer_email: null,
+        notes: customerNotes.trim() || null,
         files: [
           {
             original_name: uploadedFile.original_name,
@@ -221,7 +235,8 @@ export const CustomerPrintPortal: React.FC<Props> = ({
         ],
       };
 
-      const res = await fetch(`/api/public/qr/${encodeURIComponent(qrToken)}/orders`, {
+      const activeToken = branchData.qr_token || qrToken || 'default';
+      const res = await fetch(`/api/public/qr/${encodeURIComponent(activeToken)}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -249,7 +264,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     }
   };
 
-  // 5. Pay with Razorpay Test Mode
+  // 5. Pay with Razorpay
   const handlePayNow = async () => {
     if (!createdOrder) return;
 
@@ -257,7 +272,6 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     setPaymentError(null);
 
     try {
-      // Step A: Initiate Payment
       const initRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -265,14 +279,13 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
       if (!initRes.ok) {
         const errData = await initRes.json().catch(() => ({}));
-        throw new Error(errData.message || 'Failed to initiate Razorpay payment.');
+        throw new Error(errData.message || 'Failed to initiate payment.');
       }
 
       const initData = await initRes.json();
       const rzpOrderId = initData.razorpay.razorpay_order_id;
       const isMock = !initData.razorpay?.key_id || initData.razorpay.key_id.includes('mock');
 
-      // If real Razorpay key is configured and Razorpay JS SDK is loaded, open official Razorpay Checkout
       if (!isMock && typeof (window as any).Razorpay !== 'undefined') {
         const options = {
           key: initData.razorpay.key_id,
@@ -283,7 +296,6 @@ export const CustomerPrintPortal: React.FC<Props> = ({
           order_id: rzpOrderId,
           handler: async function (response: any) {
             try {
-              // Verify Payment on Backend
               const verifyRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/verify-payment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -325,13 +337,11 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
         const rzp = new (window as any).Razorpay(options);
         rzp.open();
-        return; // Wait for modal completion
+        return;
       }
 
-      // Fallback: Mock Test Mode Simulation
+      // Fallback test simulation
       const rzpPaymentId = `pay_test_${Math.floor(100000 + Math.random() * 900000)}`;
-
-      // Calculate mock signature via Web Crypto API with test secret "mock_secret_key_67890"
       const encoder = new TextEncoder();
       const keyData = encoder.encode('mock_secret_key_67890');
       const cryptoKey = await window.crypto.subtle.importKey(
@@ -350,7 +360,6 @@ export const CustomerPrintPortal: React.FC<Props> = ({
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
 
-      // Verify Payment on Backend
       const verifyRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/verify-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -384,7 +393,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     }
   };
 
-  // Poll order status to automatically catch Soundbox payments within 2.5 seconds
+  // Poll order status to automatically catch Soundbox payments
   useEffect(() => {
     if (!createdOrder || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED' || paymentSuccess) {
       return;
@@ -400,7 +409,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
           }
         }
       } catch (err) {
-        // ignore background poll errors
+        // background poll quiet
       }
     }, 2500);
 
@@ -408,131 +417,125 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   }, [createdOrder, paymentSuccess]);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      {/* Step 1: Branch QR Resolution Header */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">
-              QR
-            </div>
-            <div>
-              <h2 className="text-white font-bold text-base flex items-center gap-2">
-                Customer Self-Service Terminal
-                <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  Phase 4 Razorpay Active
-                </span>
-              </h2>
-              <p className="text-xs text-slate-400">Simulate customer scanning shop QR code</p>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Shop Identity Card (Clean, modern counter branding) */}
+      {loadingBranch ? (
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80 animate-pulse">
+          <div className="flex items-center space-x-4">
+            <div className="w-14 h-14 rounded-2xl bg-slate-200"></div>
+            <div className="space-y-2 flex-1">
+              <div className="h-5 bg-slate-200 rounded w-1/3"></div>
+              <div className="h-3.5 bg-slate-100 rounded w-1/2"></div>
             </div>
           </div>
-
-          {onOpenPairingInfo && (
-            <button
-              onClick={onOpenPairingInfo}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 transition-colors flex items-center gap-1.5 self-start sm:self-center cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Windows Agent Pairing Code
-            </button>
-          )}
         </div>
-
-        {/* QR Selector input */}
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-          <label className="block text-xs font-semibold text-slate-600 mb-1">
-            Active QR Code Token
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={qrToken}
-              onChange={(e) => setQrToken(e.target.value)}
-              placeholder="e.g. pe_demo_connaught_branch_token_99"
-              className="flex-1 text-sm px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-            />
-            <button
-              onClick={() => resolveBranch(qrToken)}
-              disabled={loadingBranch}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loadingBranch ? 'animate-spin' : ''}`} />
-              Verify QR
-            </button>
+      ) : branchError ? (
+        <div className="bg-rose-50 border border-rose-200 rounded-3xl p-6 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
           </div>
-
-          {branchError && (
-            <div className="mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{branchError}</span>
-            </div>
-          )}
-
-          {branchData && (
-            <div className="mt-4 p-4 bg-emerald-50/80 border border-emerald-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="font-bold text-rose-900 text-base">{branchError}</h3>
+          <p className="text-xs text-rose-600 max-w-sm mx-auto">
+            Please make sure you scanned the official QR code at the shop counter, or ask the store operator.
+          </p>
+          <button
+            onClick={() => resolveBranch(qrToken)}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry Connection
+          </button>
+        </div>
+      ) : branchData && (
+        <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
+                <Store className="w-7 h-7" />
+              </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-900 text-sm">{branchData.shop.name}</span>
-                  <span className="text-xs text-slate-500">•</span>
-                  <span className="text-xs font-medium text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    {branchData.branch.name}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                    {branchData.shop.name}
+                  </h1>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Instant Counter Print
                   </span>
                 </div>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  {branchData.branch.address}, {branchData.branch.city} • Phone: {branchData.branch.phone || 'Available'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-emerald-700">
-                <Printer className="w-4 h-4" />
-                <span>{branchData.printers.length} Printer(s) Online</span>
+                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap font-medium">
+                  <span>{branchData.branch.name}</span>
+                  {branchData.branch.city && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        {branchData.branch.city}
+                      </span>
+                    </>
+                  )}
+                  {branchData.branch.phone && (
+                    <>
+                      <span>•</span>
+                      <span>{branchData.branch.phone}</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* If Order Placed: Success Screen with Razorpay Checkout */}
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200/70 px-3.5 py-1.5 rounded-xl self-start sm:self-center">
+              <Printer className="w-4 h-4 text-indigo-600" />
+              <span>{branchData.printers.length} Printer Ready</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Flow: If Order Placed Show Payment / Success Receipt */}
       {createdOrder ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center">
-            {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' ? (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 sm:p-8 text-center space-y-6">
+          <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center shadow-inner">
+            {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED' ? (
               <CheckCircle2 className="w-9 h-9 text-emerald-600" />
             ) : (
-              <CreditCard className="w-8 h-8" />
+              <CreditCard className="w-8 h-8 text-indigo-600" />
             )}
           </div>
 
           <div>
-            <span className={`inline-block px-3 py-1 font-semibold text-xs rounded-full uppercase tracking-wider mb-2 ${
-              paymentSuccess || createdOrder.status === 'PRINT_QUEUED'
+            <span className={`inline-block px-3 py-1 font-bold text-[11px] rounded-full uppercase tracking-wider mb-2 ${
+              paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED'
                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                 : 'bg-amber-100 text-amber-800 border border-amber-200'
             }`}>
-              Status: {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' ? 'PRINT_QUEUED' : createdOrder.status}
+              {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED'
+                ? '✓ ORDER SENT TO PRINTER'
+                : 'AWAITING PAYMENT'}
             </span>
 
-            <h3 className="text-2xl font-black text-slate-900">
-              {paymentSuccess || createdOrder.status === 'PRINT_QUEUED'
-                ? 'Payment Successful & Job Queued!'
-                : 'Order Created — Ready for Payment'}
-            </h3>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+              {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED'
+                ? 'Your Document is Printing!'
+                : 'Complete Payment to Release Print'}
+            </h2>
 
-            <p className="text-sm text-slate-600 max-w-md mx-auto mt-1">
-              {paymentSuccess || createdOrder.status === 'PRINT_QUEUED'
-                ? 'Your payment was verified via HMAC-SHA256. Print job is enqueued and ready for the paired Windows Desktop Agent!'
-                : 'Your document is verified and stored securely. Complete payment to release the print job.'}
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
+              {paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED'
+                ? 'Payment confirmed! The counter printer has received your job and is spooling pages now. Collect your prints from the counter.'
+                : 'Scan the UPI QR code below with any payment app. Your document will start printing instantly once the Soundbox confirms.'}
             </p>
           </div>
 
-          {/* Order Details Receipt Box */}
-          <div className="max-w-md mx-auto bg-slate-50 rounded-xl p-5 border border-slate-200 text-left space-y-3">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-              <span className="text-xs text-slate-500 font-medium">Order Reference:</span>
-              <div className="flex items-center gap-2">
+          {/* Receipt Breakdown Card */}
+          <div className="max-w-md mx-auto bg-slate-50 rounded-2xl p-5 border border-slate-200/80 text-left space-y-3">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200/80">
+              <span className="text-xs text-slate-500 font-medium">Order Token:</span>
+              <div className="flex items-center gap-1.5">
                 <span className="font-mono font-bold text-slate-900 text-sm">{createdOrder.order_number}</span>
                 <button
                   onClick={copyOrderNumber}
-                  className="p-1 hover:bg-slate-200 rounded text-slate-500 transition-colors cursor-pointer"
+                  className="p-1 hover:bg-slate-200/80 rounded-lg text-slate-500 transition-colors cursor-pointer"
                   title="Copy Order Number"
                 >
                   {copiedOrderNumber ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
@@ -541,119 +544,125 @@ export const CustomerPrintPortal: React.FC<Props> = ({
             </div>
 
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-500">Customer Name:</span>
+              <span className="text-slate-500">Customer:</span>
               <span className="font-semibold text-slate-800">{createdOrder.customer_name}</span>
             </div>
 
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-500">Subtotal Amount:</span>
-              <span className="font-semibold text-slate-800">₹{parseFloat(String(createdOrder.subtotal_amount)).toFixed(2)}</span>
+              <span className="text-slate-500">Document:</span>
+              <span className="font-semibold text-slate-800 truncate max-w-[200px]">
+                {uploadedFile?.original_name || 'Uploaded Document'}
+              </span>
             </div>
 
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-500">GST (Tax 18%):</span>
-              <span className="font-semibold text-slate-800">₹{parseFloat(String(createdOrder.tax_amount)).toFixed(2)}</span>
+              <span className="text-slate-500">Print Setup:</span>
+              <span className="font-semibold text-slate-800 uppercase">
+                {paperSize} • {colorMode === 'bw' ? 'B&W' : 'Color'} • {duplexMode === 'duplex' ? 'Double-Sided' : 'Single-Sided'} ({copies} {copies > 1 ? 'copies' : 'copy'})
+              </span>
             </div>
 
-            <div className="flex justify-between items-center text-sm font-bold pt-2 border-t border-slate-200 text-indigo-900">
-              <span>Total Payable:</span>
-              <span>₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)}</span>
+            <div className="flex justify-between items-center text-sm font-black pt-2.5 border-t border-slate-200/80 text-indigo-950">
+              <span>Total Paid:</span>
+              <span className="text-base text-emerald-700">₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Payment Actions */}
+          {/* Payment Section */}
           {paymentError && (
-            <div className="max-w-md mx-auto p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2 text-left">
+            <div className="max-w-md mx-auto p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl flex items-center gap-2 text-left">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{paymentError}</span>
             </div>
           )}
 
-          {!(paymentSuccess || createdOrder.status === 'PRINT_QUEUED') ? (
+          {!(paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED') ? (
             <div className="max-w-md mx-auto space-y-4">
               {/* Payment Method Selector */}
-              <div className="flex bg-slate-200/80 p-1 rounded-xl text-xs font-bold text-slate-600">
+              <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-600">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('soundbox')}
-                  className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     paymentMethod === 'soundbox' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
                   }`}
                 >
-                  <span>🔊 Shop Soundbox / UPI</span>
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>Shop Soundbox / UPI</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('razorpay')}
-                  className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     paymentMethod === 'razorpay' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
                   }`}
                 >
-                  <span>💳 Card / Gateway</span>
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Cards / Online</span>
                 </button>
               </div>
 
-              {/* METHOD 1: Soundbox / Direct UPI QR */}
+              {/* METHOD 1: Shop Soundbox / Dynamic UPI QR */}
               {paymentMethod === 'soundbox' && (
-                <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-sm text-center space-y-3">
-                  <div className="space-y-0.5">
+                <div className="bg-white border-2 border-indigo-100 rounded-3xl p-5 shadow-xs text-center space-y-4">
+                  <div className="space-y-1">
                     <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
                       {upiData?.soundbox_provider === 'phonepe'
                         ? 'PhonePe SmartSpeaker'
                         : upiData?.soundbox_provider === 'gpay'
                         ? 'Google Pay Soundbox'
                         : upiData?.soundbox_provider === 'direct_upi'
-                        ? 'Direct Bank UPI'
-                        : 'Paytm Soundbox'} Active
+                        ? 'Direct Counter UPI'
+                        : 'Paytm Soundbox'} Connected
                     </span>
-                    <h3 className="text-base font-extrabold text-slate-900">
+                    <h3 className="text-xl font-black text-slate-900">
                       Scan to Pay ₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)}
                     </h3>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-xs text-slate-500">
                       Payee: <strong className="text-slate-700">{upiData?.merchant_name || branchData?.shop?.name || 'Shop Counter'}</strong>{' '}
                       {upiData?.merchant_vpa && (
-                        <span className="font-mono bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                          ({upiData.merchant_vpa})
+                        <span className="font-mono bg-slate-100 text-indigo-700 px-2 py-0.5 rounded-md text-[11px] font-semibold">
+                          {upiData.merchant_vpa}
                         </span>
                       )}
                     </p>
                   </div>
 
-                  {/* QR Code Container */}
-                  <div className="inline-block p-3 bg-white rounded-2xl border-2 border-slate-200 shadow-inner">
+                  {/* QR Image Container */}
+                  <div className="inline-block p-3.5 bg-white rounded-3xl border-2 border-slate-200 shadow-inner">
                     {upiData?.qr_code_url ? (
                       <img
                         src={upiData.qr_code_url}
                         alt="UPI Payment QR Code"
-                        className="w-44 h-44 mx-auto object-contain"
+                        className="w-48 h-48 mx-auto object-contain"
                       />
                     ) : (
-                      <div className="w-44 h-44 flex items-center justify-center text-xs text-slate-400">
+                      <div className="w-48 h-48 flex items-center justify-center text-xs text-slate-400">
                         Generating Dynamic UPI QR...
                       </div>
                     )}
                   </div>
 
-                  {/* Mobile 1-Tap App Deep Links */}
+                  {/* 1-Tap UPI Mobile Deep Links */}
                   {upiData?.app_intents && (
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-medium text-slate-500">Or tap to open your UPI app on mobile:</p>
-                      <div className="flex justify-center gap-2">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-semibold text-slate-500">Or tap to open UPI app:</p>
+                      <div className="flex justify-center gap-2 flex-wrap">
                         <a
                           href={upiData.app_intents.gpay}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-colors"
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-colors"
                         >
                           Google Pay
                         </a>
                         <a
                           href={upiData.app_intents.phonepe}
-                          className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition-colors"
+                          className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition-colors"
                         >
                           PhonePe
                         </a>
                         <a
                           href={upiData.app_intents.paytm}
-                          className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-bold transition-colors"
+                          className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-colors"
                         >
                           Paytm
                         </a>
@@ -661,29 +670,15 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     </div>
                   )}
 
-                  {/* Soundbox Notice Box */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left flex items-start gap-2">
-                    <span className="text-base">🔊</span>
-                    <div className="text-[11px] text-amber-900 leading-tight">
-                      <strong>Auto-Print on Soundbox Voice:</strong> When your shop's Soundbox speaks <em>"₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)} prapt hue"</em>, your document prints automatically!
-                    </div>
-                  </div>
-
                   {/* Soundbox Real-Time Waiting Status */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-center space-y-2">
-                    <div className="flex items-center justify-center gap-2 text-indigo-700 font-bold text-xs">
+                  <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-3.5 text-center space-y-1">
+                    <div className="flex items-center justify-center gap-2 text-indigo-800 font-bold text-xs">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
                       <span>Listening for Soundbox Voice Confirmation...</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      As soon as your payment arrives and the counter Soundbox announces <em>"₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)} prapt hue"</em>, your order will automatically be sent to the printer!
+                    <p className="text-[11px] text-slate-500">
+                      As soon as the counter Soundbox announces payment received, your document prints immediately!
                     </p>
-                  </div>
-
-                  {/* Anti-Fraud Notice */}
-                  <div className="text-[10px] text-slate-400 bg-slate-100 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Protected by PrintEase Soundbox Security. Print triggers only after verified bank credit.</span>
                   </div>
                 </div>
               )}
@@ -694,68 +689,69 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                   <button
                     onClick={handlePayNow}
                     disabled={paying}
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {paying ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Processing Payment...</span>
+                        <span>Verifying Payment...</span>
                       </>
                     ) : (
                       <>
                         <ShieldCheck className="w-4 h-4" />
-                        <span>Pay via Cards / NetBanking / Razorpay</span>
+                        <span>Pay ₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)} Online</span>
                       </>
                     )}
                   </button>
                   <p className="text-[11px] text-slate-400">
-                    Supports Debit/Credit Cards, NetBanking, and Gateway UPI.
+                    Supports Debit/Credit Cards, NetBanking, and Wallets.
                   </p>
                 </div>
               )}
             </div>
           ) : (
-            <div className="max-w-md mx-auto bg-emerald-50/80 border border-emerald-200 rounded-xl p-4 text-left space-y-2">
+            <div className="max-w-md mx-auto bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-left space-y-1.5">
               <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>Print Job Released to Branch Spooler!</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Job Queued to Counter Spooler!</span>
               </div>
               <p className="text-xs text-slate-600">
-                The desktop agent paired with this branch will poll this job via lease-lock, download the PDF, and send it to the Windows spooler.
+                The paired Windows Desktop Agent has received this print request and is processing it right now.
               </p>
             </div>
           )}
 
-          <div className="flex justify-center gap-3 pt-2">
+          <div className="flex justify-center pt-2">
             <button
               onClick={() => {
                 setCreatedOrder(null);
                 setUploadedFile(null);
                 setPaymentSuccess(false);
               }}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+              className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-2xl transition-colors flex items-center gap-2 cursor-pointer"
             >
+              <RotateCcw className="w-3.5 h-3.5" />
               Print Another Document
             </button>
           </div>
         </div>
       ) : (
-        /* Order Creation Flow */
+        /* Order Creation Flow: Step 1 (Upload) -> Step 2 (Settings) -> Step 3 (Pay) */
         <div className="space-y-6">
-          {/* Step 2: PDF Upload Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+          {/* STEP 1: Upload PDF Card */}
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-5 sm:p-7">
+            <div className="flex items-center space-x-3.5 mb-5">
+              <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/20">
                 1
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">Upload PDF Document</h3>
-                <p className="text-xs text-slate-500">Upload your PDF file for automated page counting and printing</p>
+                <h2 className="font-bold text-slate-900 text-base">Select Document</h2>
+                <p className="text-xs text-slate-500">Upload your PDF file for instant page detection and pricing</p>
               </div>
             </div>
 
             {!uploadedFile ? (
-              <label className="border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer bg-slate-50/50 hover:bg-indigo-50/20 transition-all">
+              <label className="border-2 border-dashed border-indigo-200 hover:border-indigo-500 rounded-3xl p-8 sm:p-10 flex flex-col items-center justify-center cursor-pointer bg-indigo-50/20 hover:bg-indigo-50/40 transition-all text-center group">
                 <input
                   type="file"
                   accept="application/pdf"
@@ -763,36 +759,42 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                   disabled={uploading || !branchData}
                   className="hidden"
                 />
-                <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center mb-3">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-xs">
                   {uploading ? (
-                    <RefreshCw className="w-6 h-6 animate-spin" />
+                    <RefreshCw className="w-7 h-7 animate-spin" />
                   ) : (
-                    <Upload className="w-6 h-6" />
+                    <UploadCloud className="w-7 h-7" />
                   )}
                 </div>
-                <p className="text-sm font-semibold text-slate-800">
-                  {uploading ? 'Analyzing PDF & Verifying Checksum...' : 'Click or Drag PDF here to upload'}
+                <h3 className="text-sm sm:text-base font-bold text-slate-800">
+                  {uploading ? 'Analyzing PDF & Counting Pages...' : 'Tap to Choose PDF Document'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                  Supports standard PDF documents up to 50 MB
                 </p>
-                <p className="text-xs text-slate-400 mt-1">Accepts standard PDF documents up to 50 MB</p>
               </label>
             ) : (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
-                    <FileText className="w-5 h-5" />
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-3">
+                <div className="flex items-center space-x-3.5 overflow-hidden">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <FileText className="w-6 h-6" />
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-slate-900 text-xs sm:text-sm">{uploadedFile.original_name}</h4>
-                    <p className="text-xs text-slate-500">
-                      {(uploadedFile.file_size / (1024 * 1024)).toFixed(2)} MB •{' '}
-                      <span className="font-bold text-indigo-600">{uploadedFile.page_count} page(s) detected</span>
+                  <div className="overflow-hidden">
+                    <h4 className="font-bold text-slate-900 text-sm truncate">{uploadedFile.original_name}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                      <span>{(uploadedFile.file_size / (1024 * 1024)).toFixed(2)} MB</span>
+                      <span>•</span>
+                      <span className="font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md text-[11px]">
+                        ✓ {uploadedFile.page_count} Page{uploadedFile.page_count > 1 ? 's' : ''} Detected
+                      </span>
                     </p>
                   </div>
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => setUploadedFile(null)}
-                  className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
+                  className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-white bg-slate-100 transition-colors shrink-0 cursor-pointer"
                 >
                   Change File
                 </button>
@@ -800,98 +802,135 @@ export const CustomerPrintPortal: React.FC<Props> = ({
             )}
 
             {uploadError && (
-              <div className="mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+              <div className="mt-3.5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{uploadError}</span>
               </div>
             )}
           </div>
 
-          {/* Step 3: Print Configuration */}
+          {/* STEP 2: Print Configuration (Interactive Visual Cards) */}
           {uploadedFile && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-5 sm:p-7 space-y-6">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/20">
                   2
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm">Print Configuration</h3>
-                  <p className="text-xs text-slate-500">Customize color, sides, copies, and page ranges</p>
+                  <h2 className="font-bold text-slate-900 text-base">Print Configuration</h2>
+                  <p className="text-xs text-slate-500">Choose your color, sides, copies, and paper preferences</p>
                 </div>
               </div>
 
+              {/* Setting Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Color Mode */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Color Mode</label>
-                  <div className="grid grid-cols-2 gap-2">
+                {/* 1. Color Mode Cards */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>Color Mode</span>
+                    <span className="text-[11px] text-slate-400 font-normal">Select appearance</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* B&W Card */}
                     <button
                       type="button"
                       onClick={() => setColorMode('bw')}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative ${
                         colorMode === 'bw'
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
-                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                          ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/20 text-indigo-950'
+                          : 'border-slate-200/90 hover:border-slate-300 bg-white text-slate-700'
                       }`}
                     >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs font-black">
+                          B/W
+                        </div>
+                        <span className="text-[11px] font-bold text-indigo-700 bg-white border border-indigo-100 px-2 py-0.5 rounded-md">
+                          {bwPriceDisplay}
+                        </span>
+                      </div>
                       <div className="text-xs font-bold">Black & White</div>
-                      <div className="text-[11px] text-slate-500">Economical & Crisp</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Crisp monochrome</div>
                     </button>
 
+                    {/* Color Card */}
                     <button
                       type="button"
                       onClick={() => setColorMode('color')}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative ${
                         colorMode === 'color'
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
-                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                          ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/20 text-indigo-950'
+                          : 'border-slate-200/90 hover:border-slate-300 bg-white text-slate-700'
                       }`}
                     >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-pink-500 via-amber-400 to-indigo-500 text-white flex items-center justify-center">
+                          <Palette className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-[11px] font-bold text-indigo-700 bg-white border border-indigo-100 px-2 py-0.5 rounded-md">
+                          {colorPriceDisplay}
+                        </span>
+                      </div>
                       <div className="text-xs font-bold">Full Color</div>
-                      <div className="text-[11px] text-slate-500">Vibrant Quality</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Vibrant quality</div>
                     </button>
                   </div>
                 </div>
 
-                {/* Duplex Mode */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Print Sides (Duplex)</label>
-                  <div className="grid grid-cols-2 gap-2">
+                {/* 2. Duplex Mode Cards */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>Print Sides</span>
+                    <span className="text-[11px] text-slate-400 font-normal">Single or duplex</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Single Sided */}
                     <button
                       type="button"
                       onClick={() => setDuplexMode('single')}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                         duplexMode === 'single'
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
-                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                          ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/20 text-indigo-950'
+                          : 'border-slate-200/90 hover:border-slate-300 bg-white text-slate-700'
                       }`}
                     >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+                          <FileText className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
                       <div className="text-xs font-bold">Single-Sided</div>
-                      <div className="text-[11px] text-slate-500">1 side per sheet</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">1 page per sheet</div>
                     </button>
 
+                    {/* Double Sided */}
                     <button
                       type="button"
                       onClick={() => setDuplexMode('duplex')}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                         duplexMode === 'duplex'
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-semibold ring-1 ring-indigo-600'
-                          : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                          ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/20 text-indigo-950'
+                          : 'border-slate-200/90 hover:border-slate-300 bg-white text-slate-700'
                       }`}
                     >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+                          <Layers className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
                       <div className="text-xs font-bold">Double-Sided</div>
-                      <div className="text-[11px] text-slate-500">2 sides per sheet</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Prints both sides</div>
                     </button>
                   </div>
                 </div>
 
-                {/* Paper Size */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Paper Size</label>
+                {/* 3. Paper Size Selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">Paper Size</label>
                   <select
                     value={paperSize}
                     onChange={(e) => setPaperSize(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
                     {(branchData?.pricing_rules || []).filter((r) => r.is_active !== false).length > 0 ? (
                       (branchData?.pricing_rules || [])
@@ -907,22 +946,24 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                   </select>
                 </div>
 
-                {/* Copies */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Copies</label>
-                  <div className="flex items-center space-x-3">
+                {/* 4. Copies Counter Stepper */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">Copies Required</label>
+                  <div className="flex items-center space-x-3 bg-slate-50 border border-slate-200/90 rounded-2xl p-1.5">
                     <button
                       type="button"
                       onClick={() => setCopies((prev) => Math.max(1, prev - 1))}
-                      className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold text-slate-700 text-base cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center font-black text-slate-700 text-lg shadow-2xs transition-colors cursor-pointer"
                     >
                       -
                     </button>
-                    <span className="font-bold text-base text-slate-900 w-8 text-center">{copies}</span>
+                    <span className="font-black text-base text-slate-900 flex-1 text-center font-mono">
+                      {copies} {copies > 1 ? 'sets' : 'set'}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setCopies((prev) => Math.min(50, prev + 1))}
-                      className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold text-slate-700 text-base cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center font-black text-slate-700 text-lg shadow-2xs transition-colors cursor-pointer"
                     >
                       +
                     </button>
@@ -931,40 +972,40 @@ export const CustomerPrintPortal: React.FC<Props> = ({
               </div>
 
               {/* Page Range Selection */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <label className="text-xs font-semibold text-slate-700">Page Selection</label>
-                <div className="flex gap-4 items-center">
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+              <div className="space-y-2.5 pt-4 border-t border-slate-100">
+                <label className="text-xs font-bold text-slate-700">Pages to Print</label>
+                <div className="flex gap-5 items-center flex-wrap">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                     <input
                       type="radio"
                       name="pageRangeMode"
                       checked={pageRangeMode === 'all'}
                       onChange={() => setPageRangeMode('all')}
-                      className="text-indigo-600 focus:ring-indigo-500"
+                      className="text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                     />
-                    <span>All Pages ({uploadedFile.page_count} pages)</span>
+                    <span>All Pages (All {uploadedFile.page_count} pages)</span>
                   </label>
 
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                     <input
                       type="radio"
                       name="pageRangeMode"
                       checked={pageRangeMode === 'custom'}
                       onChange={() => setPageRangeMode('custom')}
-                      className="text-indigo-600 focus:ring-indigo-500"
+                      className="text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                     />
-                    <span>Custom Range</span>
+                    <span>Specific Pages (Custom range)</span>
                   </label>
                 </div>
 
                 {pageRangeMode === 'custom' && (
-                  <div className="mt-2">
+                  <div className="mt-2.5">
                     <input
                       type="text"
                       value={customPageRange}
                       onChange={(e) => setCustomPageRange(e.target.value)}
                       placeholder="e.g. 1-3, 5, 7"
-                      className="text-xs px-3.5 py-2 rounded-xl border border-slate-200 w-full max-w-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="text-xs px-4 py-2.5 rounded-2xl border border-slate-200/90 w-full max-w-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
                       Enter comma-separated page numbers or ranges (e.g. "1-4" or "1, 3, 5-8").
@@ -973,95 +1014,89 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Live Cost Calculation Bar */}
+              {/* Live Cost Estimation Bar */}
               {estimate && (
-                <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
-                      ₹
+                <div className="bg-gradient-to-r from-indigo-50 to-indigo-50/40 border border-indigo-100 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider">
+                        Estimated Amount
+                      </span>
+                      {calculating && <RefreshCw className="w-3 h-3 text-indigo-600 animate-spin" />}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm">
-                          Total Estimate: ₹{estimate.total_amount.toFixed(2)}
-                        </span>
-                        {calculating && <RefreshCw className="w-3 h-3 text-indigo-600 animate-spin" />}
-                      </div>
-                      <p className="text-[11px] text-slate-500">
-                        Subtotal: ₹{estimate.subtotal.toFixed(2)} + GST (18%): ₹{estimate.tax_amount.toFixed(2)} • Sheets:{' '}
-                        {estimate.items[0]?.total_sheets}
-                      </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-black text-slate-900">
+                        ₹{estimate.total_amount.toFixed(2)}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        (₹{estimate.subtotal.toFixed(2)} + GST ₹{estimate.tax_amount.toFixed(2)})
+                      </span>
                     </div>
+                    <p className="text-[11px] text-slate-500">
+                      Total Sheets: {estimate.items[0]?.total_sheets || 1} • Impressions: {(estimate.items[0]?.effective_page_count || 1) * copies}
+                    </p>
                   </div>
 
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-indigo-200 text-indigo-700 rounded-lg self-start sm:self-center">
-                    Instant Pricing Rule Applied
+                  <span className="text-xs font-bold px-3 py-1 bg-white border border-indigo-200/80 text-indigo-700 rounded-xl self-start sm:self-center shadow-2xs">
+                    Shop Rates Applied
                   </span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Step 4: Customer Details & Order Submit */}
+          {/* STEP 3: Customer Information & Proceed to Pay Form */}
           {uploadedFile && estimate && (
-            <form onSubmit={handleSubmitOrder} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+            <form onSubmit={handleSubmitOrder} className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-5 sm:p-7 space-y-5">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/20">
                   3
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm">Customer Information</h3>
-                  <p className="text-xs text-slate-500">Enter your details to track your print job and receive receipt</p>
+                  <h2 className="font-bold text-slate-900 text-base">Customer Details</h2>
+                  <p className="text-xs text-slate-500">Provide your name so the shop operator can hand you your prints</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700">Full Name *</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Full Name *</label>
                   <input
                     type="text"
                     required
+                    placeholder="e.g. Rahul Sharma"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700">Phone Number *</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Mobile Number *</label>
                   <input
-                    type="text"
+                    type="tel"
                     required
+                    placeholder="e.g. 9876543210"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
+                    className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
                   />
                 </div>
 
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-semibold text-slate-700">Email Address (Optional)</label>
-                  <input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-semibold text-slate-700">Special Printing Notes (Optional)</label>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">Special Note for Shopkeeper (Optional)</label>
                   <input
                     type="text"
-                    placeholder="e.g. Staple top left, spiral binding, etc."
+                    placeholder="e.g. Corner staple, spiral binding, keep ready by 5 PM"
                     value={customerNotes}
                     onChange={(e) => setCustomerNotes(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               {orderError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{orderError}</span>
                 </div>
@@ -1070,7 +1105,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
               <button
                 type="submit"
                 disabled={submittingOrder}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {submittingOrder ? (
                   <>
@@ -1079,8 +1114,8 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                   </>
                 ) : (
                   <>
-                    <CreditCard className="w-4 h-4" />
-                    <span>Confirm Order & Proceed to Pay (₹{estimate.total_amount.toFixed(2)})</span>
+                    <span>Proceed to Pay ₹{estimate.total_amount.toFixed(2)} & Print</span>
+                    <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>

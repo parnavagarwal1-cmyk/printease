@@ -7,8 +7,8 @@
     <title>PrintEase — Autonomous Multi-Shop QR Printing SaaS</title>
     <!-- Official Razorpay Checkout Modal SDK -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <script type="module" crossorigin src="/assets/index-BvfLUH9R.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BJG-w8MF.css">
+    <script type="module" crossorigin src="/assets/index-Bg0B03S4.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DJw-nfdO.css">
   </head>
   <body>
     <div id="root"></div>
