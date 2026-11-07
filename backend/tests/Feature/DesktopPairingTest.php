@@ -93,5 +93,36 @@ class DesktopPairingTest extends TestCase
         $printersResponse->assertStatus(200)
             ->assertJsonCount(1, 'printers')
             ->assertJsonPath('printers.0.name', 'DeskJet 2130');
+
+        // 6. Test stale device is reported as offline when heartbeat is > 2 minutes old
+        $device = DesktopDevice::where('device_uuid', 'win-client-uuid-999')->first();
+        $device->update(['last_heartbeat_at' => now()->subMinutes(10)]);
+
+        $branchShow = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $ownerToken,
+        ])->getJson("/api/branches/{$branch->id}");
+        $branchShow->assertStatus(200);
+        $this->assertEquals('offline', $branchShow->json('branch.desktop_devices.0.status'));
+
+        // 7. Test owner can delete device
+        $deleteResp = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $ownerToken,
+        ])->deleteJson("/api/branches/{$branch->id}/devices/{$device->id}");
+        $deleteResp->assertStatus(200);
+        $this->assertDatabaseMissing('desktop_devices', ['id' => $device->id]);
+
+        // 8. Test owner can clean up inactive devices
+        DesktopDevice::create([
+            'branch_id' => $branch->id,
+            'device_name' => 'Stale PC',
+            'device_uuid' => 'stale-pc-1',
+            'status' => 'standby',
+        ]);
+        $cleanupResp = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $ownerToken,
+        ])->postJson("/api/branches/{$branch->id}/devices/cleanup");
+        $cleanupResp->assertStatus(200)
+            ->assertJsonPath('deleted_count', 1);
+        $this->assertDatabaseMissing('desktop_devices', ['device_uuid' => 'stale-pc-1']);
     }
 }

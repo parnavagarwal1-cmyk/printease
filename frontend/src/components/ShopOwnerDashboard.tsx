@@ -23,7 +23,8 @@ import {
   Wallet,
   Volume2,
   QrCode,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react';
 
 export const ShopOwnerDashboard: React.FC = () => {
@@ -477,6 +478,47 @@ export const ShopOwnerDashboard: React.FC = () => {
       }
     } catch (err) {
       console.error('Pairing code gen error:', err);
+    }
+  };
+
+  const handleDeleteDevice = async (deviceId: number) => {
+    if (!token || !activeBranchId) return;
+    if (!window.confirm('Are you sure you want to remove this desktop agent?')) return;
+
+    try {
+      const res = await fetch(`/api/branches/${activeBranchId}/devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (res.ok) {
+        setDevices(prev => prev.filter(d => d.id !== deviceId));
+        fetchBranchData();
+      }
+    } catch (err) {
+      console.error('Delete device error:', err);
+    }
+  };
+
+  const handleCleanupDevices = async () => {
+    if (!token || !activeBranchId) return;
+    if (!window.confirm('Remove all offline and standby PC sessions from this branch?')) return;
+
+    try {
+      const res = await fetch(`/api/branches/${activeBranchId}/devices/cleanup`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (res.ok) {
+        fetchBranchData();
+      }
+    } catch (err) {
+      console.error('Cleanup devices error:', err);
     }
   };
 
@@ -1819,13 +1861,25 @@ export const ShopOwnerDashboard: React.FC = () => {
                 <h3 className="font-bold text-sm text-slate-900">Paired Windows Desktop Agents</h3>
                 <p className="text-xs text-slate-500">Windows PC clients running PrintEase Spooler daemon</p>
               </div>
-              <button
-                onClick={handleGeneratePairingCode}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Pair New PC</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {devices.length > 0 && (
+                  <button
+                    onClick={handleCleanupDevices}
+                    className="px-3 py-2 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors border border-slate-200 hover:border-rose-200 cursor-pointer"
+                    title="Remove offline and standby PC entries"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear Inactive PCs</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleGeneratePairingCode}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Pair New PC</span>
+                </button>
+              </div>
             </div>
 
             {newPairingCode && (
@@ -1864,15 +1918,27 @@ export const ShopOwnerDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        dev.status === 'online' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {dev.status}
-                      </span>
-                      <div className="text-[10px] text-slate-400 mt-1">
-                        {dev.last_heartbeat_at ? `Heartbeat: ${new Date(dev.last_heartbeat_at).toLocaleTimeString()}` : 'Never'}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          dev.status === 'online' ? 'bg-emerald-100 text-emerald-800' :
+                          dev.status === 'standby' ? 'bg-amber-100 text-amber-800' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {dev.status}
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-1">
+                          {dev.last_heartbeat_at ? `Heartbeat: ${new Date(dev.last_heartbeat_at).toLocaleTimeString()}` : 'Never'}
+                        </div>
                       </div>
+
+                      <button
+                        onClick={() => handleDeleteDevice(dev.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Delete this device from branch"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))

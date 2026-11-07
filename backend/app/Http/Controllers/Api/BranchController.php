@@ -136,6 +136,17 @@ class BranchController extends Controller
 
         $branch = Branch::with(['printers', 'desktopDevices', 'qrCodes', 'pricingRules'])->findOrFail($id);
 
+        $threshold = now()->subMinutes(2);
+        $branch->desktopDevices->transform(function ($dev) use ($threshold) {
+            if ($dev->status === 'online') {
+                $lastSeen = $dev->last_heartbeat_at ?? $dev->created_at;
+                if (!$lastSeen || $lastSeen->lt($threshold)) {
+                    $dev->status = 'offline';
+                }
+            }
+            return $dev;
+        });
+
         return response()->json(['branch' => $branch]);
     }
 
@@ -249,7 +260,14 @@ class BranchController extends Controller
         $failedJobs = $printJobs->where('status', 'PRINT_FAILED')->count();
 
         $activePrinters = $branch->printers->where('is_active', true)->count();
-        $onlineDevices = $branch->desktopDevices->where('status', 'online')->count();
+        $onlineThreshold = now()->subMinutes(2);
+        $onlineDevices = $branch->desktopDevices->filter(function ($dev) use ($onlineThreshold) {
+            if ($dev->status !== 'online') {
+                return false;
+            }
+            $lastSeen = $dev->last_heartbeat_at ?? $dev->created_at;
+            return $lastSeen && $lastSeen->gte($onlineThreshold);
+        })->count();
 
         return response()->json([
             'branch' => [
@@ -473,6 +491,77 @@ class BranchController extends Controller
                     'color_starting' => $r->color_single_price,
                 ]),
             ],
+        ]);
+    }
+
+    /**
+     * Delete or unpair a desktop device from a branch.
+     */
+    public function deleteDevice(Request $request, int $id, int $deviceId): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->canAccessBranch($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
+        }
+
+        $branch = Branch::findOrFail($id);
+        $device = DesktopDevice::where('branch_id', $branch->id)->where('id', $deviceId)->firstOrFail();
+
+        // Unclaim any queued or downloading jobs from this device
+        PrintJob::where('claimed_by_device_id', $device->id)
+            ->whereIn('status', ['PRINT_QUEUED', 'DOWNLOADING', 'PRINTING'])
+            ->update([
+                'claimed_by_device_id' => null,
+                'job_lease_token' => null,
+                'status' => 'PRINT_QUEUED',
+            ]);
+
+        $device->delete();
+
+        return response()->json([
+            'message' => 'Device removed successfully.',
+            'device_id' => $deviceId,
+        ]);
+    }
+
+    /**
+     * Clean up all inactive and standby desktop devices for a branch.
+     */
+    public function cleanupDevices(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->canAccessBranch($id)) {
+            return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
+        }
+
+        $branch = Branch::findOrFail($id);
+        $threshold = now()->subMinutes(2);
+
+        $staleDevices = DesktopDevice::where('branch_id', $branch->id)
+            ->where(function ($q) use ($threshold) {
+                $q->where('status', '!=', 'online')
+                  ->orWhere(function ($q2) use ($threshold) {
+                      $q2->where('status', 'online')
+                         ->where(function ($q3) use ($threshold) {
+                             $q3->where('last_heartbeat_at', '<', $threshold)
+                                ->orWhere(function ($q4) use ($threshold) {
+                                    $q4->whereNull('last_heartbeat_at')
+                                       ->where('created_at', '<', $threshold);
+                                });
+                         });
+                  });
+            })
+            ->get();
+
+        $count = $staleDevices->count();
+        foreach ($staleDevices as $dev) {
+            PrintJob::where('claimed_by_device_id', $dev->id)->update(['claimed_by_device_id' => null]);
+            $dev->delete();
+        }
+
+        return response()->json([
+            'message' => "Cleaned up {$count} inactive desktop device(s).",
+            'deleted_count' => $count,
         ]);
     }
 }

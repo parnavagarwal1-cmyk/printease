@@ -122,6 +122,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/branches/{id}', [BranchController::class, 'show']);
     Route::put('/branches/{id}', [BranchController::class, 'update']);
     Route::post('/branches/{id}/pairing-code', [BranchController::class, 'generatePairingCode']);
+    Route::delete('/branches/{id}/devices/{deviceId}', [BranchController::class, 'deleteDevice']);
+    Route::post('/branches/{id}/devices/cleanup', [BranchController::class, 'cleanupDevices']);
     Route::get('/branches/{id}/analytics', [BranchController::class, 'analytics']);
     Route::get('/branches/{id}/orders', [BranchController::class, 'orders']);
     Route::put('/branches/{id}/pricing-rules', [BranchController::class, 'updatePricingRules']);
