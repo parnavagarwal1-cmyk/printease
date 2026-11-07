@@ -592,13 +592,24 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                 <div className="bg-white border-2 border-indigo-100 rounded-2xl p-4 shadow-sm text-center space-y-3">
                   <div className="space-y-0.5">
                     <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
-                      {upiData?.soundbox_provider === 'phonepe' ? 'PhonePe Soundbox' : 'Paytm Soundbox'} Active
+                      {upiData?.soundbox_provider === 'phonepe'
+                        ? 'PhonePe SmartSpeaker'
+                        : upiData?.soundbox_provider === 'gpay'
+                        ? 'Google Pay Soundbox'
+                        : upiData?.soundbox_provider === 'direct_upi'
+                        ? 'Direct Bank UPI'
+                        : 'Paytm Soundbox'} Active
                     </span>
                     <h3 className="text-base font-extrabold text-slate-900">
                       Scan to Pay ₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)}
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      Payee: <strong className="text-slate-700">{upiData?.merchant_name || 'Metro Print Solutions'}</strong> ({upiData?.merchant_vpa || 'metroprint@paytm'})
+                      Payee: <strong className="text-slate-700">{upiData?.merchant_name || branchData?.shop?.name || 'Shop Counter'}</strong>{' '}
+                      {upiData?.merchant_vpa && (
+                        <span className="font-mono bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                          ({upiData.merchant_vpa})
+                        </span>
+                      )}
                     </p>
                   </div>
 

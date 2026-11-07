@@ -62,6 +62,9 @@ class BranchController extends Controller
             'state' => ['nullable', 'string', 'max:100'],
             'pincode' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'merchant_vpa' => ['nullable', 'string', 'max:100'],
+            'merchant_name' => ['nullable', 'string', 'max:150'],
+            'soundbox_provider' => ['nullable', 'string', 'max:30'],
         ]);
 
         if (!$user->canAccessShop((int) $validated['shop_id'])) {
@@ -157,6 +160,9 @@ class BranchController extends Controller
             'state' => ['nullable', 'string', 'max:100'],
             'pincode' => ['nullable', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'merchant_vpa' => ['nullable', 'string', 'max:100'],
+            'merchant_name' => ['nullable', 'string', 'max:150'],
+            'soundbox_provider' => ['nullable', 'string', 'max:30'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 

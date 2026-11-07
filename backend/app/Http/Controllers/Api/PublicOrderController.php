@@ -56,6 +56,9 @@ class PublicOrderController extends Controller
                 'address' => $branch->address,
                 'city' => $branch->city,
                 'phone' => $branch->phone,
+                'merchant_vpa' => $branch->merchant_vpa,
+                'merchant_name' => $branch->merchant_name,
+                'soundbox_provider' => $branch->soundbox_provider ?? 'paytm',
             ],
             'shop' => [
                 'id' => $branch->shop->id,

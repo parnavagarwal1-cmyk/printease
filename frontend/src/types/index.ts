@@ -4,6 +4,9 @@ export interface BranchInfo {
   address: string | null;
   city: string | null;
   phone: string | null;
+  merchant_vpa?: string | null;
+  merchant_name?: string | null;
+  soundbox_provider?: string | null;
 }
 
 export interface ShopInfo {

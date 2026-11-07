@@ -19,7 +19,11 @@ import {
   MapPin,
   Phone,
   Mail,
-  User as UserIcon
+  User as UserIcon,
+  Wallet,
+  Volume2,
+  QrCode,
+  ShieldCheck
 } from 'lucide-react';
 
 export const ShopOwnerDashboard: React.FC = () => {
@@ -65,10 +69,19 @@ export const ShopOwnerDashboard: React.FC = () => {
   const [posterData, setPosterData] = useState<any | null>(null);
 
   // UI state
-  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'pricing' | 'poster' | 'hardware'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'pricing' | 'payments' | 'poster' | 'hardware'>('analytics');
   const [loading, setLoading] = useState<boolean>(false);
   const [savingPrices, setSavingPrices] = useState<boolean>(false);
   const [priceSaveSuccess, setPriceSaveSuccess] = useState<boolean>(false);
+
+  // Payments & UPI configuration state
+  const [merchantVpa, setMerchantVpa] = useState<string>('');
+  const [merchantName, setMerchantName] = useState<string>('');
+  const [soundboxProvider, setSoundboxProvider] = useState<string>('paytm');
+  const [savingPayments, setSavingPayments] = useState<boolean>(false);
+  const [paymentSaveSuccess, setPaymentSaveSuccess] = useState<boolean>(false);
+  const [paymentSaveError, setPaymentSaveError] = useState<string | null>(null);
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState<string | null>(null);
 
   // Pairing code modal
   const [newPairingCode, setNewPairingCode] = useState<string | null>(null);
@@ -103,7 +116,11 @@ export const ShopOwnerDashboard: React.FC = () => {
         const data = await res.json();
         setBranches(data.branches || []);
         if (data.branches && data.branches.length > 0) {
-          setActiveBranchId(data.branches[0].id);
+          const firstBranch = data.branches[0];
+          setActiveBranchId(firstBranch.id);
+          setMerchantVpa(firstBranch.merchant_vpa || '');
+          setMerchantName(firstBranch.merchant_name || firstBranch.name || '');
+          setSoundboxProvider(firstBranch.soundbox_provider || 'paytm');
         }
       }
     } catch (err) {
@@ -140,13 +157,18 @@ export const ShopOwnerDashboard: React.FC = () => {
         setOrders(ordData.orders || []);
       }
 
-      // C: Branch Details (Printers, Pricing, Devices)
+      // C: Branch Details (Printers, Pricing, Devices, UPI Payment Settings)
       const brRes = await fetch(`/api/branches/${activeBranchId}`, { headers });
       if (brRes.ok) {
         const brData = await brRes.json();
         setPricingRules(brData.branch?.pricing_rules || []);
         setPrinters(brData.branch?.printers || []);
         setDevices(brData.branch?.desktop_devices || []);
+        if (brData.branch) {
+          setMerchantVpa(brData.branch.merchant_vpa || '');
+          setMerchantName(brData.branch.merchant_name || brData.branch.name || '');
+          setSoundboxProvider(brData.branch.soundbox_provider || 'paytm');
+        }
       }
 
       // D: QR Poster Data
@@ -328,6 +350,72 @@ export const ShopOwnerDashboard: React.FC = () => {
     } finally {
       setSavingPrices(false);
     }
+  };
+
+  // 4b. Save UPI & Soundbox Payment Settings
+  const handleSavePayments = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !activeBranchId) return;
+
+    if (!merchantVpa.trim()) {
+      setPaymentSaveError('Please enter a valid UPI ID (VPA), e.g. 9876543210@paytm or yourname@okhdfcbank');
+      return;
+    }
+
+    setSavingPayments(true);
+    setPaymentSaveSuccess(false);
+    setPaymentSaveError(null);
+
+    try {
+      const res = await fetch(`/api/branches/${activeBranchId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          merchant_vpa: merchantVpa.trim(),
+          merchant_name: merchantName.trim() || undefined,
+          soundbox_provider: soundboxProvider,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to update payment settings.');
+      }
+
+      setPaymentSaveSuccess(true);
+      setTimeout(() => setPaymentSaveSuccess(false), 3500);
+
+      // Update in memory branches list
+      setBranches(prev => prev.map(b => b.id === activeBranchId ? {
+        ...b,
+        merchant_vpa: merchantVpa.trim(),
+        merchant_name: merchantName.trim() || b.name,
+        soundbox_provider: soundboxProvider
+      } : b));
+
+      // Refresh QR poster data
+      const posRes = await fetch(`/api/branches/${activeBranchId}/qr-poster`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+      });
+      if (posRes.ok) {
+        const posData = await posRes.json();
+        setPosterData(posData.poster);
+      }
+    } catch (err: any) {
+      setPaymentSaveError(err.message || 'Error saving payment settings');
+    } finally {
+      setSavingPayments(false);
+    }
+  };
+
+  const handleCopyWebhook = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedWebhookUrl(url);
+    setTimeout(() => setCopiedWebhookUrl(null), 2500);
   };
 
   // 5. Generate New Pairing Code
@@ -959,10 +1047,10 @@ export const ShopOwnerDashboard: React.FC = () => {
       )}
 
       {/* Navigation Tabs */}
-      <div className="flex gap-2 border-b border-slate-200 pb-2">
+      <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
             activeTab === 'analytics'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -973,7 +1061,7 @@ export const ShopOwnerDashboard: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('pricing')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
             activeTab === 'pricing'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -983,8 +1071,23 @@ export const ShopOwnerDashboard: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setActiveTab('payments')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+            activeTab === 'payments'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Wallet className="w-3.5 h-3.5" />
+          <span>UPI & Online Payments</span>
+          {!merchantVpa && (
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="UPI ID not set"></span>
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveTab('poster')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
             activeTab === 'poster'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -995,7 +1098,7 @@ export const ShopOwnerDashboard: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('hardware')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
             activeTab === 'hardware'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1221,6 +1324,284 @@ export const ShopOwnerDashboard: React.FC = () => {
             </button>
           </div>
         </form>
+      )}
+
+      {/* Tab: UPI & Online Payments Setup */}
+      {activeTab === 'payments' && (
+        <div className="space-y-6">
+          {/* Status Alert Banner */}
+          {merchantVpa ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-900">Direct Bank UPI Payments Active</h4>
+                  <p className="text-[11px] text-emerald-700 mt-0.5">
+                    Customer terminal transfers are routed directly to <strong className="font-mono bg-emerald-100/70 px-1.5 py-0.5 rounded text-emerald-900">{merchantVpa}</strong> ({merchantName || 'Branch'})
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-600 text-white uppercase tracking-wider shrink-0 self-start sm:self-center">
+                Live & Receiving Funds
+              </span>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-amber-900">UPI ID Not Configured</h4>
+                  <p className="text-[11px] text-amber-700 mt-0.5">
+                    Please configure your shop's UPI ID below so customers can scan and pay directly into your bank account.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-amber-500 text-white uppercase tracking-wider shrink-0 self-start sm:self-center">
+                Setup Required
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: UPI Configuration Form (7 cols) */}
+            <form onSubmit={handleSavePayments} className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Bank UPI & Soundbox Settings</h3>
+                  <p className="text-xs text-slate-500">Payments will be deposited directly to this UPI address</p>
+                </div>
+                {paymentSaveSuccess && (
+                  <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Saved successfully!</span>
+                  </span>
+                )}
+              </div>
+
+              {paymentSaveError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{paymentSaveError}</span>
+                </div>
+              )}
+
+              {/* Field 1: UPI ID (VPA) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Shop UPI ID (Virtual Payment Address) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Wallet className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={merchantVpa}
+                    onChange={(e) => setMerchantVpa(e.target.value)}
+                    placeholder="e.g. 9876543210@paytm, midtown@okhdfcbank"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  GPay, PhonePe, Paytm, and BHIM transfers from customers will be credited to this UPI ID.
+                </p>
+
+                {/* Quick handle suggestions */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-semibold">Quick Suffixes:</span>
+                  {['@paytm', '@okhdfcbank', '@okaxis', '@ybl', '@ibl'].map(suffix => (
+                    <button
+                      type="button"
+                      key={suffix}
+                      onClick={() => {
+                        const base = merchantVpa.split('@')[0];
+                        if (base) setMerchantVpa(`${base}${suffix}`);
+                        else setMerchantVpa(`shop${suffix}`);
+                      }}
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-mono transition-colors cursor-pointer"
+                    >
+                      {suffix}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Field 2: Merchant Display Name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Payee / Business Display Name
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Store className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={merchantName}
+                    onChange={(e) => setMerchantName(e.target.value)}
+                    placeholder="e.g. Midtown Stationary & Cyber Cafe"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Shown to the customer on their UPI payment screen as the payee name.
+                </p>
+              </div>
+
+              {/* Field 3: Verification & Soundbox Provider */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Counter Payment Verification & Hardware Soundbox
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {[
+                    { id: 'paytm', name: 'Paytm Soundbox', desc: 'Paytm for Business speaker & webhook', badge: 'Recommended' },
+                    { id: 'phonepe', name: 'PhonePe SmartSpeaker', desc: 'PhonePe Business merchant notifications', badge: 'Popular' },
+                    { id: 'gpay', name: 'Google Pay Soundbox', desc: 'Google Pay for Business device', badge: 'Standard' },
+                    { id: 'direct_upi', name: 'Direct UPI / Manual', desc: 'Counter staff checks phone & prints', badge: 'Self-Serve' },
+                  ].map(provider => (
+                    <div
+                      key={provider.id}
+                      onClick={() => setSoundboxProvider(provider.id)}
+                      className={`p-3 rounded-xl border-2 flex flex-col justify-between cursor-pointer transition-all ${
+                        soundboxProvider === provider.id
+                          ? 'border-indigo-600 bg-indigo-50/40 text-indigo-900'
+                          : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs">{provider.name}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          soundboxProvider === provider.id
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {provider.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-tight">{provider.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="text-[11px] text-slate-500">
+                  Changes take effect immediately on counter terminals.
+                </div>
+                <button
+                  type="submit"
+                  disabled={savingPayments}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {savingPayments ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  <span>Save UPI Settings</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Right Column: Live Terminal Simulator & Webhook Guide (5 cols) */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Dynamic Customer Terminal Preview */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-indigo-600" />
+                    <h4 className="font-bold text-xs text-slate-900">Customer Mobile Terminal Preview</h4>
+                  </div>
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                    Live Demo
+                  </span>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center space-y-3">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                      {soundboxProvider === 'phonepe' ? 'PhonePe SmartSpeaker' : 'Paytm Soundbox'} Active
+                    </span>
+                    <h5 className="text-sm font-extrabold text-slate-900">Scan & Pay ₹10.00</h5>
+                    <p className="text-[11px] text-slate-600">
+                      Paying: <strong className="text-slate-800">{merchantName || 'Midtown Stationary'}</strong>
+                    </p>
+                    <p className="text-[10px] font-mono text-indigo-600 font-semibold">
+                      {merchantVpa || 'your-upi-id@bank'}
+                    </p>
+                  </div>
+
+                  {/* QR Image */}
+                  <div className="inline-block p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(
+                        `upi://pay?pa=${merchantVpa || 'merchant@upi'}&pn=${encodeURIComponent(merchantName || 'Shop')}&am=10.00&cu=INR&tn=PrintEase Order Test`
+                      )}`}
+                      alt="UPI QR Code Preview"
+                      className="w-32 h-32 mx-auto"
+                    />
+                  </div>
+
+                  {/* UPI Apps preview */}
+                  <div className="flex justify-center gap-1.5 pt-1">
+                    <span className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded text-[10px] font-bold">
+                      GPay
+                    </span>
+                    <span className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-700 rounded text-[10px] font-bold">
+                      PhonePe
+                    </span>
+                    <span className="px-2.5 py-1 bg-sky-50 border border-sky-200 text-sky-700 rounded text-[10px] font-bold">
+                      Paytm
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  💡 <strong>How it works:</strong> When a customer selects copies and page range at your counter, PrintEase generates this dynamic QR code with your UPI ID. All funds go directly into your linked bank account!
+                </div>
+              </div>
+
+              {/* Soundbox Webhook Integration Guide */}
+              <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl shadow-sm p-6 space-y-4">
+                <div className="flex items-center gap-2 text-indigo-300">
+                  <Volume2 className="w-5 h-5 text-indigo-400" />
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-white">Instant Soundbox Webhook</h4>
+                </div>
+
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  To automatically trigger printing when your counter Soundbox announces payment, paste this webhook in your <strong>Paytm for Business</strong> or <strong>PhonePe Merchant</strong> dashboard:
+                </p>
+
+                <div className="space-y-1.5">
+                  <span className="text-[10px] uppercase font-bold text-indigo-300 tracking-wider">
+                    Your Webhook Endpoint URL:
+                  </span>
+                  <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-xl p-2.5 font-mono text-[11px] text-emerald-400">
+                    <span className="truncate flex-1">
+                      {window.location.origin}/api/soundbox/{soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyWebhook(`${window.location.origin}/api/soundbox/${soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}`)}
+                      className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                    >
+                      {copiedWebhookUrl ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedWebhookUrl ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Secure bank verification ensures zero unpaid prints.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Tab 3: Printable QR Poster */}

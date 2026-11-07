@@ -19,9 +19,14 @@ class SoundboxPaymentService
     public function generateUpiPayload(Order $order): array
     {
         $branch = $order->branch;
+        if ($branch) {
+            $branch->loadMissing('shop');
+        }
         $amount = number_format((float) $order->total_amount, 2, '.', '');
-        $vpa = $branch->merchant_vpa ?: 'metroprint@paytm';
-        $payeeName = $branch->merchant_name ?: $branch->name;
+        $vpa = ($branch && $branch->merchant_vpa) ? $branch->merchant_vpa : 'metroprint@paytm';
+        $payeeName = ($branch && $branch->merchant_name) 
+            ? $branch->merchant_name 
+            : (($branch && $branch->shop) ? $branch->shop->name : ($branch->name ?? 'PrintEase Merchant'));
         $orderNumber = $order->order_number;
         $note = "PrintEase Order {$orderNumber}";
 
