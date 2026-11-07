@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://printease-production-7b9f.up.railway.app/api/:path*"
+    }
+  ]
+}
