@@ -21,6 +21,7 @@ class Branch extends Model
         'merchant_vpa',
         'merchant_name',
         'soundbox_provider',
+        'default_paper_size',
         'is_active',
     ];
 

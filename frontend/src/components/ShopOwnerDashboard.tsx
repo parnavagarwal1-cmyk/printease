@@ -73,6 +73,7 @@ export const ShopOwnerDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [savingPrices, setSavingPrices] = useState<boolean>(false);
   const [priceSaveSuccess, setPriceSaveSuccess] = useState<boolean>(false);
+  const [defaultPaperSize, setDefaultPaperSize] = useState<string>('A4');
 
   // Payments & UPI configuration state
   const [merchantVpa, setMerchantVpa] = useState<string>('');
@@ -118,6 +119,7 @@ export const ShopOwnerDashboard: React.FC = () => {
         if (data.branches && data.branches.length > 0) {
           const firstBranch = data.branches[0];
           setActiveBranchId(firstBranch.id);
+          setDefaultPaperSize(firstBranch.default_paper_size || 'A4');
           setMerchantVpa(firstBranch.merchant_vpa || '');
           setMerchantName(firstBranch.merchant_name || firstBranch.name || '');
           setSoundboxProvider(firstBranch.soundbox_provider || 'paytm');
@@ -161,10 +163,41 @@ export const ShopOwnerDashboard: React.FC = () => {
       const brRes = await fetch(`/api/branches/${activeBranchId}`, { headers });
       if (brRes.ok) {
         const brData = await brRes.json();
-        setPricingRules(brData.branch?.pricing_rules || []);
+        const rawRules = brData.branch?.pricing_rules || [];
+        const hasA4 = rawRules.some((r: any) => r.paper_size?.toUpperCase() === 'A4');
+        const hasA3 = rawRules.some((r: any) => r.paper_size?.toUpperCase() === 'A3');
+        const merged = [...rawRules];
+        if (!hasA4) {
+          merged.push({
+            paper_size: 'A4',
+            bw_single_price: 2.0,
+            bw_duplex_price: 3.0,
+            color_single_price: 10.0,
+            color_duplex_price: 18.0,
+            duplex_pricing_mode: 'per_side',
+            min_order_amount: 5.0,
+            tax_rate_percent: 0.0,
+            is_active: true,
+          });
+        }
+        if (!hasA3) {
+          merged.push({
+            paper_size: 'A3',
+            bw_single_price: 5.0,
+            bw_duplex_price: 8.0,
+            color_single_price: 25.0,
+            color_duplex_price: 45.0,
+            duplex_pricing_mode: 'per_side',
+            min_order_amount: 10.0,
+            tax_rate_percent: 0.0,
+            is_active: false,
+          });
+        }
+        setPricingRules(merged.map((r: any) => ({ ...r, is_active: r.is_active !== false })));
         setPrinters(brData.branch?.printers || []);
         setDevices(brData.branch?.desktop_devices || []);
         if (brData.branch) {
+          setDefaultPaperSize(brData.branch.default_paper_size || 'A4');
           setMerchantVpa(brData.branch.merchant_vpa || '');
           setMerchantName(brData.branch.merchant_name || brData.branch.name || '');
           setSoundboxProvider(brData.branch.soundbox_provider || 'paytm');
@@ -338,12 +371,16 @@ export const ShopOwnerDashboard: React.FC = () => {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({ rules: pricingRules }),
+        body: JSON.stringify({ 
+          rules: pricingRules,
+          default_paper_size: defaultPaperSize,
+        }),
       });
 
       if (res.ok) {
         setPriceSaveSuccess(true);
         setTimeout(() => setPriceSaveSuccess(false), 2500);
+        fetchBranchData();
       }
     } catch (err) {
       console.error('Save prices error:', err);
@@ -1208,109 +1245,228 @@ export const ShopOwnerDashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {pricingRules.map((rule, idx) => (
-              <div key={rule.paper_size || idx} className="p-5 border border-slate-200 rounded-xl bg-slate-50/50 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-base text-slate-900">{rule.paper_size} Paper Size</span>
-                  <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full uppercase">
-                    Configured
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="text-slate-600 block mb-1 font-medium">B&W Single (₹)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={rule.bw_single_price}
-                      onChange={(e) => {
-                        const copy = [...pricingRules];
-                        copy[idx].bw_single_price = parseFloat(e.target.value) || 0;
-                        setPricingRules(copy);
-                      }}
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-600 block mb-1 font-medium">B&W Duplex (₹)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={rule.bw_duplex_price}
-                      onChange={(e) => {
-                        const copy = [...pricingRules];
-                        copy[idx].bw_duplex_price = parseFloat(e.target.value) || 0;
-                        setPricingRules(copy);
-                      }}
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-600 block mb-1 font-medium">Color Single (₹)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={rule.color_single_price}
-                      onChange={(e) => {
-                        const copy = [...pricingRules];
-                        copy[idx].color_single_price = parseFloat(e.target.value) || 0;
-                        setPricingRules(copy);
-                      }}
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-600 block mb-1 font-medium">Color Duplex (₹)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={rule.color_duplex_price}
-                      onChange={(e) => {
-                        const copy = [...pricingRules];
-                        copy[idx].color_duplex_price = parseFloat(e.target.value) || 0;
-                        setPricingRules(copy);
-                      }}
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-600 block mb-1 font-medium">Min Order (₹)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={rule.min_order_amount}
-                      onChange={(e) => {
-                        const copy = [...pricingRules];
-                        copy[idx].min_order_amount = parseFloat(e.target.value) || 0;
-                        setPricingRules(copy);
-                      }}
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-600 block mb-1 font-medium">GST Tax (%)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={rule.tax_rate_percent}
-                      onChange={(e) => {
-                        const copy = [...pricingRules];
-                        copy[idx].tax_rate_percent = parseFloat(e.target.value) || 0;
-                        setPricingRules(copy);
-                      }}
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
-                    />
-                  </div>
-                </div>
+          {/* Default Paper Size Bar */}
+          <div className="bg-gradient-to-r from-indigo-50/80 via-white to-indigo-50/50 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span className="text-xs font-bold text-slate-900">Default Paper Size for Customers:</span>
+                <span className="text-xs font-mono font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                  {defaultPaperSize}
+                </span>
               </div>
-            ))}
+              <p className="text-[11px] text-slate-500">
+                This paper size will automatically be pre-selected when customers scan your counter QR code.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold text-slate-600">Pre-select:</span>
+              {['A4', 'A3'].map((size) => {
+                const isSizeActive = pricingRules.find(r => r.paper_size?.toUpperCase() === size)?.is_active !== false;
+                return (
+                  <button
+                    type="button"
+                    key={size}
+                    disabled={!isSizeActive}
+                    onClick={() => setDefaultPaperSize(size)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                      defaultPaperSize === size
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300'
+                    }`}
+                  >
+                    <span>{size}</span>
+                    {defaultPaperSize === size && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[...pricingRules]
+              .sort((a, b) => {
+                if (a.paper_size?.toUpperCase() === 'A4') return -1;
+                if (b.paper_size?.toUpperCase() === 'A4') return 1;
+                return (a.paper_size || '').localeCompare(b.paper_size || '');
+              })
+              .map((rule) => {
+                const originalIdx = pricingRules.findIndex(r => r.paper_size === rule.paper_size);
+                const idx = originalIdx !== -1 ? originalIdx : 0;
+                const isEnabled = rule.is_active !== false;
+                const isDefault = defaultPaperSize === rule.paper_size;
+
+                return (
+                  <div 
+                    key={rule.paper_size || idx} 
+                    className={`p-5 border-2 rounded-2xl transition-all space-y-4 ${
+                      isEnabled 
+                        ? 'border-slate-200 bg-white shadow-sm' 
+                        : 'border-slate-200/70 bg-slate-50/80 opacity-75'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-base text-slate-900">{rule.paper_size} Paper Size</span>
+                        {isDefault ? (
+                          <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+                            ★ Default
+                          </span>
+                        ) : (
+                          isEnabled && (
+                            <button
+                              type="button"
+                              onClick={() => setDefaultPaperSize(rule.paper_size)}
+                              className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+                            >
+                              Set Default
+                            </button>
+                          )
+                        )}
+                      </div>
+
+                      {/* ON / OFF Toggle Switch */}
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[11px] font-bold ${isEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          {isEnabled ? 'ON' : 'OFF'}
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isEnabled}
+                          onClick={() => {
+                            const copy = [...pricingRules];
+                            const newStatus = !isEnabled;
+                            copy[idx].is_active = newStatus;
+                            setPricingRules(copy);
+                            // If turning off current default, fallback to other active rule
+                            if (!newStatus && isDefault) {
+                              const other = copy.find(r => r.paper_size !== rule.paper_size && r.is_active !== false);
+                              if (other) setDefaultPaperSize(other.paper_size);
+                            }
+                          }}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isEnabled ? 'bg-indigo-600' : 'bg-slate-300'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                              isEnabled ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Disabled Warning Notice */}
+                    {!isEnabled && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-800 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                        <span><strong>{rule.paper_size} is turned OFF:</strong> Customers cannot select or print this size at your counter.</span>
+                      </div>
+                    )}
+
+                    <div className={`grid grid-cols-2 gap-3 text-xs transition-opacity ${!isEnabled ? 'opacity-60 pointer-events-none' : ''}`}>
+                      <div>
+                        <label className="text-slate-600 block mb-1 font-medium">B&W Single (₹)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          disabled={!isEnabled}
+                          value={rule.bw_single_price}
+                          onChange={(e) => {
+                            const copy = [...pricingRules];
+                            copy[idx].bw_single_price = parseFloat(e.target.value) || 0;
+                            setPricingRules(copy);
+                          }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-600 block mb-1 font-medium">B&W Duplex (₹)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          disabled={!isEnabled}
+                          value={rule.bw_duplex_price}
+                          onChange={(e) => {
+                            const copy = [...pricingRules];
+                            copy[idx].bw_duplex_price = parseFloat(e.target.value) || 0;
+                            setPricingRules(copy);
+                          }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-600 block mb-1 font-medium">Color Single (₹)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          disabled={!isEnabled}
+                          value={rule.color_single_price}
+                          onChange={(e) => {
+                            const copy = [...pricingRules];
+                            copy[idx].color_single_price = parseFloat(e.target.value) || 0;
+                            setPricingRules(copy);
+                          }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-600 block mb-1 font-medium">Color Duplex (₹)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          disabled={!isEnabled}
+                          value={rule.color_duplex_price}
+                          onChange={(e) => {
+                            const copy = [...pricingRules];
+                            copy[idx].color_duplex_price = parseFloat(e.target.value) || 0;
+                            setPricingRules(copy);
+                          }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-600 block mb-1 font-medium">Min Order (₹)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          disabled={!isEnabled}
+                          value={rule.min_order_amount}
+                          onChange={(e) => {
+                            const copy = [...pricingRules];
+                            copy[idx].min_order_amount = parseFloat(e.target.value) || 0;
+                            setPricingRules(copy);
+                          }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-600 block mb-1 font-medium">GST Tax (%)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          disabled={!isEnabled}
+                          value={rule.tax_rate_percent}
+                          onChange={(e) => {
+                            const copy = [...pricingRules];
+                            copy[idx].tax_rate_percent = parseFloat(e.target.value) || 0;
+                            setPricingRules(copy);
+                          }}
+                          className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
 
           <div className="flex justify-end pt-4 border-t border-slate-100">

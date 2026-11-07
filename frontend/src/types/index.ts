@@ -7,6 +7,7 @@ export interface BranchInfo {
   merchant_vpa?: string | null;
   merchant_name?: string | null;
   soundbox_provider?: string | null;
+  default_paper_size?: string | null;
 }
 
 export interface ShopInfo {

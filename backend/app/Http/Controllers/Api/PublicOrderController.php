@@ -59,6 +59,7 @@ class PublicOrderController extends Controller
                 'merchant_vpa' => $branch->merchant_vpa,
                 'merchant_name' => $branch->merchant_name,
                 'soundbox_provider' => $branch->soundbox_provider ?? 'paytm',
+                'default_paper_size' => $branch->default_paper_size ?? 'A4',
             ],
             'shop' => [
                 'id' => $branch->shop->id,

@@ -308,6 +308,7 @@ class BranchController extends Controller
         $branch = Branch::findOrFail($id);
 
         $validated = $request->validate([
+            'default_paper_size' => ['nullable', 'string', 'max:20'],
             'rules' => ['required', 'array', 'min:1'],
             'rules.*.paper_size' => ['required', 'string', 'max:20'],
             'rules.*.bw_single_price' => ['required', 'numeric', 'min:0'],
@@ -317,7 +318,23 @@ class BranchController extends Controller
             'rules.*.duplex_pricing_mode' => ['required', 'in:per_side,per_sheet'],
             'rules.*.min_order_amount' => ['required', 'numeric', 'min:0'],
             'rules.*.tax_rate_percent' => ['required', 'numeric', 'min:0'],
+            'rules.*.is_active' => ['sometimes', 'boolean'],
         ]);
+
+        if (!empty($validated['default_paper_size'])) {
+            try {
+                $branch->update(['default_paper_size' => strtoupper($validated['default_paper_size'])]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                if (str_contains($e->getMessage(), 'Unknown column') || str_contains($e->getMessage(), 'default_paper_size')) {
+                    \Illuminate\Support\Facades\Schema::table('branches', function (\Illuminate\Database\Schema\Blueprint $table) {
+                        $table->string('default_paper_size', 20)->default('A4')->after('soundbox_provider');
+                    });
+                    $branch->update(['default_paper_size' => strtoupper($validated['default_paper_size'])]);
+                } else {
+                    throw $e;
+                }
+            }
+        }
 
         $updatedRules = [];
         foreach ($validated['rules'] as $ruleData) {
@@ -334,7 +351,7 @@ class BranchController extends Controller
                     'duplex_pricing_mode' => $ruleData['duplex_pricing_mode'],
                     'min_order_amount' => $ruleData['min_order_amount'],
                     'tax_rate_percent' => $ruleData['tax_rate_percent'],
-                    'is_active' => true,
+                    'is_active' => array_key_exists('is_active', $ruleData) ? (bool) $ruleData['is_active'] : true,
                 ]
             );
             $updatedRules[] = $rule;
@@ -353,6 +370,7 @@ class BranchController extends Controller
         return response()->json([
             'message' => 'Pricing rules updated successfully',
             'pricing_rules' => $updatedRules,
+            'default_paper_size' => $branch->fresh()->default_paper_size ?? 'A4',
         ]);
     }
 

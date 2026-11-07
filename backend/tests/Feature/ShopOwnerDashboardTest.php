@@ -157,6 +157,56 @@ class ShopOwnerDashboardTest extends TestCase
         ]);
     }
 
+    public function test_shop_owner_can_toggle_a3_paper_size_and_set_default(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $response = $this->putJson("/api/branches/{$this->branch->id}/pricing-rules", [
+            'default_paper_size' => 'A4',
+            'rules' => [
+                [
+                    'paper_size' => 'A4',
+                    'bw_single_price' => 2.00,
+                    'bw_duplex_price' => 3.00,
+                    'color_single_price' => 10.00,
+                    'color_duplex_price' => 18.00,
+                    'duplex_pricing_mode' => 'per_side',
+                    'min_order_amount' => 5.00,
+                    'tax_rate_percent' => 0.00,
+                    'is_active' => true,
+                ],
+                [
+                    'paper_size' => 'A3',
+                    'bw_single_price' => 5.00,
+                    'bw_duplex_price' => 8.00,
+                    'color_single_price' => 25.00,
+                    'color_duplex_price' => 45.00,
+                    'duplex_pricing_mode' => 'per_side',
+                    'min_order_amount' => 10.00,
+                    'tax_rate_percent' => 0.00,
+                    'is_active' => false,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('default_paper_size', 'A4');
+
+        $this->assertDatabaseHas('pricing_rules', [
+            'branch_id' => $this->branch->id,
+            'paper_size' => 'A3',
+            'is_active' => false,
+        ]);
+
+        $this->assertDatabaseHas('pricing_rules', [
+            'branch_id' => $this->branch->id,
+            'paper_size' => 'A4',
+            'is_active' => true,
+        ]);
+
+        $this->assertEquals('A4', $this->branch->fresh()->default_paper_size);
+    }
+
     public function test_shop_owner_can_add_printer_to_branch(): void
     {
         Sanctum::actingAs($this->owner);

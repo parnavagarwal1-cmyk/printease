@@ -90,10 +90,15 @@ class PricingService
             $pageRange = $item['page_range'] ?? 'all';
 
             // Find branch pricing rule for paper size
-            $pricingRule = PricingRule::where('branch_id', $branch->id)
+            $existingRule = PricingRule::where('branch_id', $branch->id)
                 ->where('paper_size', $paperSize)
-                ->where('is_active', true)
                 ->first();
+
+            if ($existingRule && !$existingRule->is_active) {
+                throw new \InvalidArgumentException("Paper size {$paperSize} is currently disabled at this branch.");
+            }
+
+            $pricingRule = ($existingRule && $existingRule->is_active) ? $existingRule : null;
 
             if (!$pricingRule) {
                 // Fallback default rule if not explicitly configured

@@ -81,8 +81,14 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       }
       const data: QrResolutionResponse = await res.json();
       setBranchData(data);
-      if (data.pricing_rules.length > 0) {
-        setPaperSize(data.pricing_rules[0].paper_size);
+      const defaultSize = data.branch?.default_paper_size || 'A4';
+      const activeRules = (data.pricing_rules || []).filter((r: any) => r.is_active !== false);
+      if (activeRules.some((r: any) => r.paper_size.toUpperCase() === defaultSize.toUpperCase())) {
+        setPaperSize(defaultSize.toUpperCase());
+      } else if (activeRules.length > 0) {
+        setPaperSize(activeRules[0].paper_size.toUpperCase());
+      } else {
+        setPaperSize('A4');
       }
     } catch (err: any) {
       setBranchError(err.message || 'Failed to scan shop QR code.');
@@ -887,8 +893,17 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     onChange={(e) => setPaperSize(e.target.value)}
                     className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
-                    <option value="A4">A4 (Standard 210 × 297 mm)</option>
-                    <option value="A3">A3 (Large 297 × 420 mm)</option>
+                    {(branchData?.pricing_rules || []).filter((r) => r.is_active !== false).length > 0 ? (
+                      (branchData?.pricing_rules || [])
+                        .filter((r) => r.is_active !== false)
+                        .map((r) => (
+                          <option key={r.paper_size} value={r.paper_size.toUpperCase()}>
+                            {r.paper_size.toUpperCase()} {r.paper_size.toUpperCase() === 'A4' ? '(Standard 210 × 297 mm)' : r.paper_size.toUpperCase() === 'A3' ? '(Large Poster 297 × 420 mm)' : ''}
+                          </option>
+                        ))
+                    ) : (
+                      <option value="A4">A4 (Standard 210 × 297 mm)</option>
+                    )}
                   </select>
                 </div>
 
