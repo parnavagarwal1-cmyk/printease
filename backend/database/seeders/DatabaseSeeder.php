@@ -69,7 +69,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'superadmin@printease.com'],
             [
                 'name' => 'PrintEase Master Admin',
-                'password' => Hash::make('Password123!'),
+                'password' => Hash::make('Secret@12345'),
                 'phone' => '+919999900000',
                 'role' => 'super_admin',
                 'is_active' => true,
@@ -81,7 +81,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'owner@metroprint.com'],
             [
                 'name' => 'Vikram Sharma',
-                'password' => Hash::make('Password123!'),
+                'password' => Hash::make('Secret@12345'),
                 'phone' => '+919876543210',
                 'role' => 'shop_owner',
                 'is_active' => true,
