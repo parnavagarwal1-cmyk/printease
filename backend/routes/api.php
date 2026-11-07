@@ -41,7 +41,7 @@ Route::get('/health', function () {
         'app' => [
             'name' => config('app.name', 'PrintEase'),
             'env' => config('app.env'),
-            'version' => '1.0.0',
+            'version' => '1.0.1-safe-pair',
             'laravel' => app()->version(),
             'php' => PHP_VERSION,
         ],
