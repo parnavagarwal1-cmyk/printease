@@ -2,10 +2,18 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/{any?}', function () {
+Route::get('/', function () {
     $spaPath = public_path('index.html');
     if (file_exists($spaPath)) {
         return response()->file($spaPath);
     }
     return view('welcome');
-})->where('any', '^(?!api).*$');
+});
+
+Route::fallback(function () {
+    $spaPath = public_path('index.html');
+    if (file_exists($spaPath)) {
+        return response()->file($spaPath);
+    }
+    return view('welcome');
+});
