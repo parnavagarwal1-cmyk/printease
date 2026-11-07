@@ -2,14 +2,12 @@ import { useState } from 'react';
 import { 
   Printer, 
   QrCode, 
-  Key,
-  Building2,
-  ShieldCheck
+  Building2, 
+  ShieldCheck 
 } from 'lucide-react';
 import { CustomerPrintPortal } from './components/CustomerPrintPortal';
 import { ShopOwnerDashboard } from './components/ShopOwnerDashboard';
 import { SuperAdminControlPlane } from './components/SuperAdminControlPlane';
-import { PairingHelperModal } from './components/PairingHelperModal';
 
 export function App() {
   const [initialQr] = useState<string | null>(() => {
@@ -21,7 +19,6 @@ export function App() {
   });
 
   const [activeTab, setActiveTab] = useState<'customer' | 'dashboard' | 'admin'>('customer');
-  const [showPairingModal, setShowPairingModal] = useState<boolean>(false);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans">
@@ -80,14 +77,6 @@ export function App() {
               <ShieldCheck className="w-3.5 h-3.5" />
               Super Admin
             </button>
-
-            <button
-              onClick={() => setShowPairingModal(true)}
-              className="ml-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Key className="w-3.5 h-3.5" />
-              Pairing Code
-            </button>
           </div>
         </div>
       </header>
@@ -97,7 +86,6 @@ export function App() {
         {activeTab === 'customer' ? (
           <CustomerPrintPortal 
             defaultQrToken={initialQr || "pe_wJI5xrkcQve5Sum5PJEceqlgvfIzXv8W"} 
-            onOpenPairingInfo={() => setShowPairingModal(true)}
           />
         ) : activeTab === 'dashboard' ? (
           <ShopOwnerDashboard />
@@ -105,12 +93,6 @@ export function App() {
           <SuperAdminControlPlane />
         )}
       </main>
-
-      {/* Pairing Helper Modal */}
-      <PairingHelperModal 
-        isOpen={showPairingModal} 
-        onClose={() => setShowPairingModal(false)} 
-      />
     </div>
   );
 }
