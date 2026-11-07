@@ -383,6 +383,190 @@ export const ShopOwnerDashboard: React.FC = () => {
     }
   };
 
+  // 7. High-Resolution Dedicated A4 Poster Printing
+  const handlePrintPoster = () => {
+    if (!posterData) return;
+    const qrUrl =
+      posterData.qr_image_url ||
+      `https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=15&data=${encodeURIComponent(
+        `${window.location.origin}/?qr=${posterData.qr_token}`
+      )}`;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${posterData.shop_name} - Counter QR Standee</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: #0f172a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .poster-card {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      border: 4px solid #4338ca;
+      border-radius: 28px;
+      padding: 36px 32px;
+      text-align: center;
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+    .badge-icon {
+      width: 54px;
+      height: 54px;
+      background: #4f46e5;
+      color: white;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 26px;
+    }
+    h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      margin: 0 0 6px 0;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .branch-name {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #4f46e5;
+      margin: 0 0 4px 0;
+    }
+    .branch-address {
+      font-size: 12px;
+      color: #64748b;
+      margin: 0 0 20px 0;
+    }
+    .qr-box {
+      background: #ffffff;
+      border: 3px solid #0f172a;
+      border-radius: 24px;
+      padding: 16px;
+      display: inline-block;
+      margin: 0 auto 16px;
+    }
+    .qr-img {
+      width: 260px;
+      height: 260px;
+      display: block;
+      border-radius: 12px;
+    }
+    .scan-badge {
+      display: inline-block;
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 20px;
+    }
+    .instructions-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 18px;
+      text-align: left;
+      margin-bottom: 20px;
+    }
+    .instructions-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #334155;
+      margin-bottom: 8px;
+    }
+    .step-row {
+      font-size: 13px;
+      color: #475569;
+      margin: 6px 0;
+      line-height: 1.4;
+    }
+    .step-row strong {
+      color: #0f172a;
+    }
+    .footer-note {
+      font-size: 11px;
+      color: #94a3b8;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="poster-card">
+    <div class="badge-icon">🖨️</div>
+    <h1>${posterData.shop_name}</h1>
+    <div class="branch-name">${posterData.branch_name}</div>
+    <div class="branch-address">${posterData.branch_address || ''}</div>
+
+    <div class="qr-box">
+      <img class="qr-img" src="${qrUrl}" alt="Scan to print">
+    </div>
+
+    <div class="scan-badge">
+      📷 Scan with Smartphone Camera or Google Lens
+    </div>
+
+    <div class="instructions-box">
+      <div class="instructions-title">HOW TO SELF-PRINT:</div>
+      <div class="step-row"><strong>1. Scan QR Code</strong> with your phone camera</div>
+      <div class="step-row"><strong>2. Upload PDF</strong> document & choose Color / B&W</div>
+      <div class="step-row"><strong>3. Pay via UPI / Soundbox</strong> & collect your print</div>
+    </div>
+
+    <div class="footer-note">
+      Powered by PrintEase Cloud • Instant Hardware Spooler
+    </div>
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 350);
+    };
+  </script>
+</body>
+</html>`);
+    printWindow.document.close();
+  };
+
   if (!token) {
     return (
       <div className="max-w-lg mx-auto my-10 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1048,16 +1232,16 @@ export const ShopOwnerDashboard: React.FC = () => {
               <p className="text-xs text-slate-500">Print and display this high-contrast poster at your counter</p>
             </div>
             <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+              onClick={handlePrintPoster}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Poster</span>
+              <Printer className="w-4 h-4" />
+              <span>Print A4 Poster</span>
             </button>
           </div>
 
           {/* Realistic A4 Poster Preview */}
-          <div className="max-w-md mx-auto border-4 border-indigo-600 rounded-3xl p-8 bg-white text-center shadow-xl space-y-6">
+          <div id="printable-branch-poster" className="max-w-md mx-auto border-4 border-indigo-600 rounded-3xl p-8 bg-white text-center shadow-xl space-y-6">
             <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center mx-auto">
               <Printer className="w-6 h-6" />
             </div>

@@ -27,3 +27,58 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
 }
+
+/* Print Styles: Isolate Poster to a Single Clean A4 Sheet */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Hide everything on the page during print */
+  header,
+  nav,
+  aside,
+  button,
+  .print-hide,
+  main > *:not(.print-container),
+  .metrics-grid,
+  table {
+    display: none !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-branch-poster,
+  #printable-branch-poster * {
+    visibility: visible;
+  }
+
+  #printable-branch-poster {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    margin: 0 auto !important;
+    max-width: 500px !important;
+    border: 3px solid #4338ca !important;
+    border-radius: 24px !important;
+    padding: 30px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    background: #ffffff !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
