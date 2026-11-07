@@ -65,11 +65,22 @@ class DatabaseSeeder extends Seeder
         );
 
         // 2. Super Admin User
-        $superAdmin = User::firstOrCreate(
+        $superAdmin = User::updateOrCreate(
+            ['email' => 'parnavagarwal1@gmail.com'],
+            [
+                'name' => 'Pranav Agarwal',
+                'password' => Hash::make('Pranav143@'),
+                'phone' => '+919876543210',
+                'role' => 'super_admin',
+                'is_active' => true,
+            ]
+        );
+
+        User::updateOrCreate(
             ['email' => 'superadmin@printease.com'],
             [
                 'name' => 'PrintEase Master Admin',
-                'password' => Hash::make('Secret@12345'),
+                'password' => Hash::make('Pranav143@'),
                 'phone' => '+919999900000',
                 'role' => 'super_admin',
                 'is_active' => true,

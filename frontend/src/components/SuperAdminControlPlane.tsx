@@ -19,8 +19,8 @@ export const SuperAdminControlPlane: React.FC = () => {
   const [user, setUser] = useState<any | null>(null);
 
   // Login form
-  const [email, setEmail] = useState('superadmin@printease.com');
-  const [password, setPassword] = useState('Secret@12345');
+  const [email, setEmail] = useState('parnavagarwal1@gmail.com');
+  const [password, setPassword] = useState('Pranav143@');
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -258,8 +258,8 @@ export const SuperAdminControlPlane: React.FC = () => {
         <form onSubmit={handleLogin} className="p-6 space-y-4">
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs text-indigo-900">
             <strong>Platform Super Admin Login:</strong>
-            <p className="mt-0.5">Email: <code>superadmin@printease.com</code></p>
-            <p>Password: <code>Secret@12345</code></p>
+            <p className="mt-0.5">Email: <code>parnavagarwal1@gmail.com</code></p>
+            <p>Password: <code>Pranav143@</code></p>
           </div>
 
           <div className="space-y-1">

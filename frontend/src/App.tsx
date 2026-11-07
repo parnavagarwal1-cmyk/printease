@@ -274,8 +274,8 @@ export function App() {
 
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                   <div className="font-bold text-indigo-600">Super Admin Root Account</div>
-                  <p><span className="text-slate-500">Email:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">superadmin@printease.com</code></p>
-                  <p><span className="text-slate-500">Password:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">Secret@12345</code></p>
+                  <p><span className="text-slate-500">Email:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">parnavagarwal1@gmail.com</code></p>
+                  <p><span className="text-slate-500">Password:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">Pranav143@</code></p>
                   <p><span className="text-slate-500">Role:</span> <span className="font-semibold text-slate-700">Super Admin</span></p>
                 </div>
               </div>
