@@ -5,7 +5,6 @@ import {
   ShoppingBag, 
   Printer, 
   Monitor, 
-  QrCode, 
   RefreshCw, 
   Plus, 
   Copy, 
@@ -1069,10 +1068,21 @@ export const ShopOwnerDashboard: React.FC = () => {
               <p className="text-[11px] text-slate-500 mt-0.5">{posterData.branch_address}</p>
             </div>
 
-            {/* Simulated High-Contrast QR */}
-            <div className="w-48 h-48 mx-auto bg-slate-900 rounded-2xl p-4 flex flex-col items-center justify-center text-white relative shadow-inner">
-              <QrCode className="w-32 h-32 text-white" />
-              <span className="text-[10px] font-mono tracking-widest text-slate-300 mt-1">SCAN TO PRINT</span>
+            {/* Authentic Scannable QR Code */}
+            <div className="w-56 h-56 mx-auto bg-white rounded-2xl p-2.5 border-2 border-slate-900 shadow-md flex flex-col items-center justify-center">
+              <img
+                src={
+                  posterData.qr_image_url ||
+                  `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(
+                    `${window.location.origin}/?qr=${posterData.qr_token}`
+                  )}`
+                }
+                alt={`Scan QR code to print at ${posterData.shop_name}`}
+                className="w-48 h-48 object-contain rounded-xl"
+              />
+            </div>
+            <div className="text-center font-mono text-[11px] font-bold text-slate-700 bg-slate-100 py-1.5 px-3 rounded-lg inline-block mx-auto border border-slate-200">
+              Scan with Smartphone Camera, Google Lens or iPhone Camera
             </div>
 
             <div className="space-y-2 text-left bg-slate-50 p-4 rounded-xl border border-slate-100">

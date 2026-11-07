@@ -43,6 +43,14 @@ interface HealthData {
 }
 
 export function App() {
+  const [initialQr] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('qr');
+    }
+    return null;
+  });
+
   const [activeTab, setActiveTab] = useState<'customer' | 'dashboard' | 'admin' | 'system'>('customer');
   const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -157,7 +165,7 @@ export function App() {
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {activeTab === 'customer' ? (
           <CustomerPrintPortal 
-            defaultQrToken="pe_demo_connaught_branch_token_99" 
+            defaultQrToken={initialQr || "pe_demo_connaught_branch_token_99"} 
             onOpenPairingInfo={() => setShowPairingModal(true)}
           />
         ) : activeTab === 'dashboard' ? (

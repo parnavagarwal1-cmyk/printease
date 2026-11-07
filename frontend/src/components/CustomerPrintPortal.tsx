@@ -93,6 +93,12 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   }, []);
 
   useEffect(() => {
+    if (defaultQrToken && defaultQrToken !== qrToken) {
+      setQrToken(defaultQrToken);
+    }
+  }, [defaultQrToken]);
+
+  useEffect(() => {
     if (qrToken) {
       resolveBranch(qrToken);
     }

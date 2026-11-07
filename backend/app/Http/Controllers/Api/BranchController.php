@@ -417,14 +417,15 @@ class BranchController extends Controller
         if (!$qrCode) {
             $qrCode = QrCode::create([
                 'branch_id' => $branch->id,
-                'token' => 'pe_' . Str::random(32),
-                'name' => 'Default Counter QR',
+                'token' => QrCode::generateToken(),
+                'label' => 'Default Counter QR',
                 'is_active' => true,
             ]);
         }
 
-        $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
-        $scanUrl = "{$frontendUrl}/scan/{$qrCode->token}";
+        $appUrl = config('app.url') ?: url('/');
+        $scanUrl = rtrim($appUrl, '/') . "/?qr={$qrCode->token}";
+        $qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=15&data=" . urlencode($scanUrl);
 
         return response()->json([
             'poster' => [
@@ -435,6 +436,7 @@ class BranchController extends Controller
                 'branch_phone' => $branch->phone,
                 'qr_token' => $qrCode->token,
                 'scan_url' => $scanUrl,
+                'qr_image_url' => $qrImageUrl,
                 'tagline' => 'Self-Service Contactless Printing',
                 'steps' => [
                     ['step' => 1, 'title' => 'Scan QR Code', 'description' => 'Open camera on your smartphone'],
