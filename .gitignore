@@ -12,6 +12,7 @@
 **/storage/framework/views/*
 **/dist/
 **/build/
+**/release/
 **/.idea/
 **/.vscode/
 **/.DS_Store
