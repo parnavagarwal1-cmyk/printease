@@ -8,7 +8,8 @@ import {
   RefreshCw, 
   LogIn, 
   LogOut, 
-  Layers
+  Layers,
+  Trash2
 } from 'lucide-react';
 
 export const SuperAdminControlPlane: React.FC = () => {
@@ -152,6 +153,33 @@ export const SuperAdminControlPlane: React.FC = () => {
       }
     } catch (err) {
       console.error('Toggle status error:', err);
+    }
+  };
+
+  const handleDeleteShop = async (shopId: number, shopName: string) => {
+    if (!token) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to completely delete "${shopName}"?\n\nThis will permanently delete the shop, its branches, printers, paired agents, and all order records.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/shops/${shopId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (res.ok) {
+        fetchAdminData();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Failed to remove shop');
+      }
+    } catch (err) {
+      console.error('Delete shop error:', err);
     }
   };
 
@@ -413,16 +441,26 @@ export const SuperAdminControlPlane: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleToggleShopStatus(s.id, s.status)}
-                        className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-                          s.status === 'active'
-                            ? 'text-rose-600 hover:bg-rose-50 border border-rose-200'
-                            : 'text-emerald-600 hover:bg-emerald-50 border border-emerald-200'
-                        }`}
-                      >
-                        {s.status === 'active' ? 'Suspend' : 'Activate'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleShopStatus(s.id, s.status)}
+                          className={`text-[11px] font-bold px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                            s.status === 'active'
+                              ? 'text-amber-600 hover:bg-amber-50 border border-amber-200'
+                              : 'text-emerald-600 hover:bg-emerald-50 border border-emerald-200'
+                          }`}
+                        >
+                          {s.status === 'active' ? 'Suspend' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteShop(s.id, s.name)}
+                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
+                          title={`Permanently delete ${s.name}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

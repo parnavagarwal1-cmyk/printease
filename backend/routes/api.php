@@ -135,6 +135,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/metrics', [AdminController::class, 'metrics']);
         Route::get('/shops', [AdminController::class, 'shops']);
         Route::put('/shops/{id}/status', [AdminController::class, 'updateShopStatus']);
+        Route::delete('/shops/{id}', [AdminController::class, 'deleteShop']);
         Route::get('/audit-logs', [AdminController::class, 'auditLogs']);
         Route::get('/plans', [AdminController::class, 'plans']);
     });

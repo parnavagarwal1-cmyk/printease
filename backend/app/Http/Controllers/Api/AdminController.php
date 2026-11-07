@@ -14,6 +14,8 @@ use App\Models\Shop;
 use App\Models\Subscription;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
 {
@@ -105,6 +107,65 @@ class AdminController extends Controller
         return response()->json([
             'message' => "Shop status updated to {$validated['status']}",
             'shop' => $shop,
+        ]);
+    }
+
+    /**
+     * Delete a shop and all associated data permanently (Super Admin).
+     */
+    public function deleteShop(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->isSuperAdmin()) {
+            return response()->json(['message' => 'Forbidden: Super admin access required.'], 403);
+        }
+
+        $shop = Shop::with(['branches.orders.files', 'branches.orders.printJobs'])->findOrFail($id);
+        $shopName = $shop->name;
+
+        DB::transaction(function () use ($shop) {
+            foreach ($shop->branches as $branch) {
+                foreach ($branch->orders as $order) {
+                    foreach ($order->files as $file) {
+                        try {
+                            Storage::disk('local')->delete($file->storage_path);
+                        } catch (\Throwable) {
+                            // ignore file storage deletion errors
+                        }
+                    }
+                    $order->printJobs()->delete();
+                    $order->items()->delete();
+                    $order->payments()->delete();
+                    $order->files()->delete();
+                    $order->delete();
+                }
+
+                $branch->printers()->delete();
+                $branch->desktopDevices()->delete();
+                $branch->qrCodes()->delete();
+                $branch->pricingRules()->delete();
+                $branch->delete();
+            }
+
+            $shop->members()->delete();
+            $shop->subscriptions()->delete();
+            $shop->auditLogs()->delete();
+            $shop->delete();
+        });
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'shop_id' => null,
+            'action' => 'shop_deleted_by_admin',
+            'entity_type' => 'shop',
+            'entity_id' => $id,
+            'ip_address' => $request->ip(),
+            'details' => ['deleted_shop_name' => $shopName],
+        ]);
+
+        return response()->json([
+            'message' => "Shop '{$shopName}' and all associated branches have been permanently removed.",
+            'shop_id' => $id,
         ]);
     }
 

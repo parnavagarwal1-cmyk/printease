@@ -191,13 +191,24 @@ class SuperAdminControlPlaneTest extends TestCase
         ]);
     }
 
-    public function test_super_admin_can_view_audit_trail(): void
+    public function test_super_admin_can_delete_shop(): void
     {
         Sanctum::actingAs($this->superAdmin);
 
-        $response = $this->getJson('/api/admin/audit-logs');
+        $response = $this->deleteJson("/api/admin/shops/{$this->shop->id}");
 
         $response->assertStatus(200)
-            ->assertJsonStructure(['audit_logs']);
+            ->assertJsonPath('shop_id', $this->shop->id);
+
+        $this->assertDatabaseMissing('shops', ['id' => $this->shop->id]);
+        $this->assertDatabaseMissing('branches', ['id' => $this->branch->id]);
+    }
+
+    public function test_regular_shop_owner_cannot_delete_shop(): void
+    {
+        Sanctum::actingAs($this->shopOwner);
+
+        $response = $this->deleteJson("/api/admin/shops/{$this->shop->id}");
+        $response->assertStatus(403);
     }
 }
