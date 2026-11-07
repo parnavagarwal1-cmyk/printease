@@ -69,7 +69,6 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'soundbox' | 'razorpay'>('soundbox');
   const [upiData, setUpiData] = useState<any>(null);
-  const [confirmingSoundbox, setConfirmingSoundbox] = useState<boolean>(false);
 
   // 1. Resolve Branch Details from QR Token
   const resolveBranch = useCallback(async (token: string) => {
@@ -396,34 +395,6 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     return () => clearInterval(interval);
   }, [createdOrder, paymentSuccess]);
 
-  // Handle instant soundbox simulation / confirmation
-  const handleConfirmSoundboxPaid = async () => {
-    if (!createdOrder) return;
-    setConfirmingSoundbox(true);
-    setPaymentError(null);
-    try {
-      const res = await fetch('/api/webhooks/soundbox/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_number: createdOrder.order_number,
-          provider: upiData?.soundbox_provider || 'paytm',
-        }),
-      });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || 'Soundbox confirmation failed.');
-      }
-      const data = await res.json();
-      setPaymentSuccess(true);
-      setCreatedOrder(data.order);
-    } catch (err: any) {
-      setPaymentError(err.message || 'Soundbox confirmation failed.');
-    } finally {
-      setConfirmingSoundbox(false);
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Step 1: Branch QR Resolution Header */}
@@ -675,25 +646,22 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Manual Soundbox Confirm Button */}
-                  <button
-                    type="button"
-                    onClick={handleConfirmSoundboxPaid}
-                    disabled={confirmingSoundbox}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {confirmingSoundbox ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Confirming Soundbox Payment...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Soundbox Confirmed? Click to Release Print</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Soundbox Real-Time Waiting Status */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-center space-y-2">
+                    <div className="flex items-center justify-center gap-2 text-indigo-700 font-bold text-xs">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                      <span>Listening for Soundbox Voice Confirmation...</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      As soon as your payment arrives and the counter Soundbox announces <em>"₹{parseFloat(String(createdOrder.total_amount)).toFixed(2)} prapt hue"</em>, your order will automatically be sent to the printer!
+                    </p>
+                  </div>
+
+                  {/* Anti-Fraud Notice */}
+                  <div className="text-[10px] text-slate-400 bg-slate-100 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Protected by PrintEase Soundbox Security. Print triggers only after verified bank credit.</span>
+                  </div>
                 </div>
               )}
 

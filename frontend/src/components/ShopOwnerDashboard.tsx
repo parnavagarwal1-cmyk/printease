@@ -45,6 +45,7 @@ export const ShopOwnerDashboard: React.FC = () => {
   // Pairing code modal
   const [newPairingCode, setNewPairingCode] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [approvingOrderId, setApprovingOrderId] = useState<string | null>(null);
 
   // 1. Fetch User / Branches on Token
   const fetchCurrentUser = useCallback(async (authToken: string) => {
@@ -229,6 +230,34 @@ export const ShopOwnerDashboard: React.FC = () => {
       }
     } catch (err) {
       console.error('Pairing code gen error:', err);
+    }
+  };
+
+  // 6. Shop Counter Manual Approval (Soundbox Audio Heard)
+  const handleApproveSoundboxOrder = async (orderNumber: string) => {
+    setApprovingOrderId(orderNumber);
+    try {
+      const res = await fetch('/api/webhooks/soundbox/simulate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          order_number: orderNumber,
+          provider: 'paytm',
+        }),
+      });
+      if (res.ok) {
+        await fetchBranchData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Failed to approve order');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Network error');
+    } finally {
+      setApprovingOrderId(null);
     }
   };
 
@@ -468,12 +497,13 @@ export const ShopOwnerDashboard: React.FC = () => {
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Print Job</th>
                   <th className="px-6 py-3">Created</th>
+                  <th className="px-6 py-3 text-right">Counter Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                    <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
                       No customer orders recorded yet today.
                     </td>
                   </tr>
@@ -503,6 +533,26 @@ export const ShopOwnerDashboard: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-slate-400 text-[11px]">
                         {new Date(order.created_at).toLocaleTimeString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {order.status === 'UPLOADED' || order.status === 'PAYMENT_PENDING' ? (
+                          <button
+                            onClick={() => handleApproveSoundboxOrder(order.order_number)}
+                            disabled={approvingOrderId === order.order_number}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg shadow-sm inline-flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer"
+                            title="Click once you hear Soundbox voice announce payment"
+                          >
+                            {approvingOrderId === order.order_number ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <span>🔊 Soundbox Received (Print)</span>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-emerald-600 inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Approved
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))
