@@ -1,10 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { 
   Printer, 
-  Database, 
-  Server, 
-  HardDrive, 
-  RefreshCw, 
   QrCode, 
   Key,
   Building2,
@@ -15,33 +11,6 @@ import { ShopOwnerDashboard } from './components/ShopOwnerDashboard';
 import { SuperAdminControlPlane } from './components/SuperAdminControlPlane';
 import { PairingHelperModal } from './components/PairingHelperModal';
 
-interface HealthData {
-  status: string;
-  app: {
-    name: string;
-    env: string;
-    version: string;
-    laravel: string;
-    php: string;
-  };
-  services: {
-    database: {
-      status: string;
-      driver: string;
-      version: string;
-      error: string | null;
-    };
-    storage: {
-      status: string;
-      path: string;
-    };
-    queue: {
-      driver: string;
-    };
-  };
-  timestamp: string;
-}
-
 export function App() {
   const [initialQr] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -51,34 +20,8 @@ export function App() {
     return null;
   });
 
-  const [activeTab, setActiveTab] = useState<'customer' | 'dashboard' | 'admin' | 'system'>('customer');
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastChecked, setLastChecked] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState<'customer' | 'dashboard' | 'admin'>('customer');
   const [showPairingModal, setShowPairingModal] = useState<boolean>(false);
-
-  const fetchHealth = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/health');
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
-      const data = await response.json();
-      setHealth(data);
-      setLastChecked(new Date());
-    } catch (err: any) {
-      setError(err.message || 'Failed to reach PrintEase API');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHealth();
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans">
@@ -139,18 +82,6 @@ export function App() {
             </button>
 
             <button
-              onClick={() => setActiveTab('system')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeTab === 'system'
-                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Server className="w-3.5 h-3.5" />
-              Diagnostics
-            </button>
-
-            <button
               onClick={() => setShowPairingModal(true)}
               className="ml-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
@@ -170,117 +101,8 @@ export function App() {
           />
         ) : activeTab === 'dashboard' ? (
           <ShopOwnerDashboard />
-        ) : activeTab === 'admin' ? (
-          <SuperAdminControlPlane />
         ) : (
-          /* System Architecture & Diagnostics View */
-          <div className="space-y-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Platform Core Services</h2>
-                  <p className="text-xs text-slate-500">Live health monitoring across backend, database, and storage</p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">
-                    Updated: {lastChecked.toLocaleTimeString()}
-                  </span>
-                  <button
-                    onClick={fetchHealth}
-                    disabled={loading}
-                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
-              {loading && !health ? (
-                <div className="py-12 flex flex-col items-center justify-center text-slate-400">
-                  <RefreshCw className="w-8 h-8 animate-spin mb-3 text-indigo-600" />
-                  <p className="text-xs">Probing backend APIs...</p>
-                </div>
-              ) : error ? (
-                <div className="mt-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
-                  {error}
-                </div>
-              ) : health ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  {/* Database Card */}
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2 text-slate-800 font-semibold text-xs">
-                        <Database className="w-4 h-4 text-indigo-600" />
-                        <span>MySQL 8.4 Database</span>
-                      </div>
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                        {health.services.database.status}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-600 space-y-1">
-                      <p>Driver: <span className="font-mono">{health.services.database.driver}</span></p>
-                      <p>Version: <span className="font-mono">{health.services.database.version}</span></p>
-                    </div>
-                  </div>
-
-                  {/* Backend Card */}
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2 text-slate-800 font-semibold text-xs">
-                        <Server className="w-4 h-4 text-indigo-600" />
-                        <span>Laravel 11 Backend</span>
-                      </div>
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                        {health.status}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-600 space-y-1">
-                      <p>Laravel: <span className="font-mono">{health.app.laravel}</span></p>
-                      <p>PHP: <span className="font-mono">{health.app.php}</span></p>
-                    </div>
-                  </div>
-
-                  {/* Storage Card */}
-                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2 text-slate-800 font-semibold text-xs">
-                        <HardDrive className="w-4 h-4 text-indigo-600" />
-                        <span>Private Storage</span>
-                      </div>
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                        {health.services.storage.status}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-600 space-y-1">
-                      <p>Target: <span className="font-mono truncate block">storage/app/private</span></p>
-                      <p>Encryption: <span className="font-semibold text-emerald-600">Restricted</span></p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Test Credentials Reference Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <h3 className="font-bold text-sm text-slate-900 mb-4">Seeded Test Credentials & Tokens</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                  <div className="font-bold text-indigo-600">Demo Shop Owner Account</div>
-                  <p><span className="text-slate-500">Email:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">owner@metroprint.com</code></p>
-                  <p><span className="text-slate-500">Password:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">Secret@12345</code></p>
-                  <p><span className="text-slate-500">Role:</span> <span className="font-semibold text-slate-700">Shop Owner</span></p>
-                </div>
-
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                  <div className="font-bold text-indigo-600">Super Admin Root Account</div>
-                  <p><span className="text-slate-500">Email:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">parnavagarwal1@gmail.com</code></p>
-                  <p><span className="text-slate-500">Password:</span> <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono">Pranav143@</code></p>
-                  <p><span className="text-slate-500">Role:</span> <span className="font-semibold text-slate-700">Super Admin</span></p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <SuperAdminControlPlane />
         )}
       </main>
 
