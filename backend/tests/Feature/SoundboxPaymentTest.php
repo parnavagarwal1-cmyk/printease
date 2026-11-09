@@ -178,6 +178,26 @@ class SoundboxPaymentTest extends TestCase
         ]);
     }
 
+    public function test_processes_phonepe_soundbox_webhook_via_soundbox_alias_route(): void
+    {
+        $payload = [
+            'response' => base64_encode(json_encode([
+                'data' => [
+                    'merchantTransactionId' => $this->order->order_number,
+                    'transactionId' => 'php_txn_alias_9988',
+                    'amount' => 1770, // In paise
+                    'state' => 'PAYMENT_SUCCESS',
+                ],
+            ])),
+        ];
+
+        $response = $this->postJson('/api/soundbox/phonepe', $payload);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('status', 'SUCCESS')
+            ->assertJsonPath('order.status', 'PRINT_QUEUED');
+    }
+
     public function test_simulates_soundbox_confirmation(): void
     {
         $response = $this->postJson('/api/webhooks/soundbox/simulate', [
