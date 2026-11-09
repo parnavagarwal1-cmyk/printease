@@ -62,7 +62,7 @@ class SoundboxPaymentService
     /**
      * Process incoming Paytm for Business webhook
      */
-    public function handlePaytmWebhook(array $payload): Order
+    public function handlePaytmWebhook(array $payload, ?string $branchToken = null): Order
     {
         $orderNumber = $payload['ORDERID'] ?? $payload['orderId'] ?? null;
         $status = $payload['STATUS'] ?? $payload['status'] ?? null;
@@ -85,7 +85,7 @@ class SoundboxPaymentService
     /**
      * Process incoming PhonePe Business webhook
      */
-    public function handlePhonePeWebhook(array $payload): Order
+    public function handlePhonePeWebhook(array $payload, ?string $branchToken = null): Order
     {
         // PhonePe sends base64 response or direct payload
         $data = $payload;

@@ -99,10 +99,10 @@ Route::prefix('public')->group(function () {
 
 // --- Public Webhooks (Razorpay & Soundboxes) ---
 Route::post('/webhooks/razorpay', [PaymentController::class, 'handleWebhook']);
-Route::post('/webhooks/paytm', [SoundboxWebhookController::class, 'handlePaytmWebhook']);
-Route::post('/soundbox/paytm', [SoundboxWebhookController::class, 'handlePaytmWebhook']);
-Route::post('/webhooks/phonepe', [SoundboxWebhookController::class, 'handlePhonePeWebhook']);
-Route::post('/soundbox/phonepe', [SoundboxWebhookController::class, 'handlePhonePeWebhook']);
+Route::post('/webhooks/paytm/{branchToken?}', [SoundboxWebhookController::class, 'handlePaytmWebhook']);
+Route::post('/soundbox/paytm/{branchToken?}', [SoundboxWebhookController::class, 'handlePaytmWebhook']);
+Route::post('/webhooks/phonepe/{branchToken?}', [SoundboxWebhookController::class, 'handlePhonePeWebhook']);
+Route::post('/soundbox/phonepe/{branchToken?}', [SoundboxWebhookController::class, 'handlePhonePeWebhook']);
 Route::post('/webhooks/soundbox/simulate', [SoundboxWebhookController::class, 'simulateWebhook']);
 Route::post('/soundbox/simulate', [SoundboxWebhookController::class, 'simulateWebhook']);
 

@@ -1756,22 +1756,33 @@ export const ShopOwnerDashboard: React.FC = () => {
                 </p>
 
                 <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-bold text-indigo-300 tracking-wider">
-                    Your Webhook Endpoint URL:
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-indigo-300 tracking-wider">
+                      Shop-Specific Webhook Endpoint:
+                    </span>
+                    {posterData?.qr_token && (
+                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono">
+                        Branch: {posterData.qr_token.slice(0, 10)}...
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-xl p-2.5 font-mono text-[11px] text-emerald-400">
                     <span className="truncate flex-1">
-                      {window.location.origin}/api/soundbox/{soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}
+                      {window.location.origin}/api/soundbox/{soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}{posterData?.qr_token ? `/${posterData.qr_token}` : ''}
                     </span>
                     <button
                       type="button"
-                      onClick={() => handleCopyWebhook(`${window.location.origin}/api/soundbox/${soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}`)}
+                      onClick={() => handleCopyWebhook(`${window.location.origin}/api/soundbox/${soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}${posterData?.qr_token ? `/${posterData.qr_token}` : ''}`)}
                       className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
                     >
                       {copiedWebhookUrl ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                       <span>{copiedWebhookUrl ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
+                </div>
+
+                <div className="text-[10px] text-slate-400 bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50 leading-relaxed">
+                  ℹ️ <strong>Auto-Tenant Routing:</strong> Aap chahe ye shop-specific URL dalein ya base URL (<code>/api/soundbox/{soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}</code>), PrintEase har order ke unique Order ID se payment ko automatic 100% sahi shop aur printer par route karta hai.
                 </div>
 
                 <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">

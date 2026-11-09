@@ -42,7 +42,7 @@ class SoundboxWebhookController extends Controller
     /**
      * Paytm for Business Instant Payment Notification Webhook
      */
-    public function handlePaytmWebhook(Request $request): JsonResponse
+    public function handlePaytmWebhook(Request $request, ?string $branchToken = null): JsonResponse
     {
         $payload = $request->all();
         $orderNumber = $payload['ORDERID'] ?? $payload['orderId'] ?? null;
@@ -52,7 +52,7 @@ class SoundboxWebhookController extends Controller
         }
 
         try {
-            $order = $this->soundboxService->handlePaytmWebhook($payload);
+            $order = $this->soundboxService->handlePaytmWebhook($payload, $branchToken);
 
             return response()->json([
                 'status' => 'SUCCESS',
@@ -70,12 +70,12 @@ class SoundboxWebhookController extends Controller
     /**
      * PhonePe Merchant Webhook
      */
-    public function handlePhonePeWebhook(Request $request): JsonResponse
+    public function handlePhonePeWebhook(Request $request, ?string $branchToken = null): JsonResponse
     {
         $payload = $request->all();
 
         try {
-            $order = $this->soundboxService->handlePhonePeWebhook($payload);
+            $order = $this->soundboxService->handlePhonePeWebhook($payload, $branchToken);
 
             return response()->json([
                 'status' => 'SUCCESS',
