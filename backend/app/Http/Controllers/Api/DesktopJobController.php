@@ -205,7 +205,7 @@ class DesktopJobController extends Controller
             $file->storage_path,
             $file->original_filename,
             [
-                'Content-Type' => 'application/pdf',
+                'Content-Type' => $file->mime_type ?: 'application/octet-stream',
                 'X-File-SHA256' => $file->file_hash_sha256,
             ]
         );

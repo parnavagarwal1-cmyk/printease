@@ -132,8 +132,14 @@ class PublicOrderController extends Controller
             'file' => [
                 'required',
                 'file',
-                'mimes:pdf',
                 'max:51200', // max 50 MB
+                function ($attribute, $value, $fail) {
+                    $ext = strtolower($value->getClientOriginalExtension());
+                    $validExts = ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'doc'];
+                    if (!in_array($ext, $validExts)) {
+                        $fail('The document must be a file of type: PDF, JPG, PNG, DOCX.');
+                    }
+                },
             ],
         ]);
 
@@ -143,8 +149,16 @@ class PublicOrderController extends Controller
         $mimeType = $uploadedFile->getMimeType();
         $sha256 = hash_file('sha256', $uploadedFile->getRealPath());
 
-        // Extract PDF page count
-        $pageCount = $this->extractPdfPageCount($uploadedFile->getRealPath());
+        // Extract page count based on file type
+        $extension = strtolower($uploadedFile->getClientOriginalExtension());
+        if ($extension === 'pdf') {
+            $pageCount = $this->extractPdfPageCount($uploadedFile->getRealPath());
+        } elseif (in_array($extension, ['docx', 'doc'])) {
+            $pageCount = $this->extractDocxPageCount($uploadedFile->getRealPath());
+        } else {
+            // JPG, JPEG, PNG are single sheet photos
+            $pageCount = 1;
+        }
 
         // Save into private storage (never publicly accessible)
         $datePath = now()->format('Y/m/d');
@@ -192,6 +206,7 @@ class PublicOrderController extends Controller
             'files.*.file_size' => ['required', 'integer'],
             'files.*.sha256_checksum' => ['required', 'string'],
             'files.*.page_count' => ['required', 'integer', 'min:1'],
+            'files.*.mime_type' => ['nullable', 'string', 'max:100'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.file_index' => ['required', 'integer', 'min:0'],
             'items.*.paper_size' => ['required', 'string'],
@@ -255,7 +270,7 @@ class PublicOrderController extends Controller
                     'original_filename' => $f['original_name'],
                     'storage_path' => $f['file_path'],
                     'file_hash_sha256' => $f['sha256_checksum'],
-                    'mime_type' => 'application/pdf',
+                    'mime_type' => substr($f['mime_type'] ?? 'application/pdf', 0, 50),
                     'page_count' => $f['page_count'],
                     'file_size_bytes' => $f['file_size'],
                     'expires_at' => now()->addDays(7),
@@ -366,6 +381,44 @@ class PublicOrderController extends Controller
             $pageCount = count($matches[0]);
             if ($pageCount > 0) {
                 return $pageCount;
+            }
+
+            return 1;
+        } catch (\Throwable $e) {
+            return 1;
+        }
+    }
+
+    /**
+     * Safely extract or estimate page count from Word (.docx / .doc) documents.
+     */
+    private function extractDocxPageCount(string $filePath): int
+    {
+        try {
+            // Method 1: Using ZipArchive to read docProps/app.xml
+            if (class_exists(\ZipArchive::class)) {
+                $zip = new \ZipArchive();
+                if ($zip->open($filePath) === true) {
+                    $appXml = $zip->getFromName('docProps/app.xml');
+                    $zip->close();
+                    if ($appXml && preg_match('/<Pages>(\d+)<\/Pages>/i', $appXml, $matches)) {
+                        return max(1, (int) $matches[1]);
+                    }
+                }
+            }
+
+            // Method 2: Direct search for <Pages> tag or rendered page breaks
+            $content = @file_get_contents($filePath);
+            if ($content !== false) {
+                if (preg_match('/<Pages>(\d+)<\/Pages>/i', $content, $matches)) {
+                    return max(1, (int) $matches[1]);
+                }
+
+                // Check for explicit page breaks
+                $breakCount = substr_count($content, 'w:type="page"') + substr_count($content, 'lastRenderedPageBreak');
+                if ($breakCount > 0) {
+                    return $breakCount + 1;
+                }
             }
 
             return 1;

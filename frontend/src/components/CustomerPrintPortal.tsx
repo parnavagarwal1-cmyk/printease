@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FileText, 
+  Image as ImageIcon,
   UploadCloud, 
   CheckCircle2, 
   AlertCircle, 
@@ -122,13 +123,18 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   const bwPriceDisplay = currentPricingRule ? `₹${parseFloat(String(currentPricingRule.bw_single_price)).toFixed(2)}` : '₹2.00';
   const colorPriceDisplay = currentPricingRule ? `₹${parseFloat(String(currentPricingRule.color_single_price)).toFixed(2)}` : '₹10.00';
 
-  // 2. Handle File Upload
+  // 2. Handle File Upload (PDF, JPG, PNG, DOCX)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
-      setUploadError('Please select a valid PDF file (.pdf).');
+    const fileName = file.name.toLowerCase();
+    const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
+    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png)$/i.test(fileName);
+    const isDocx = file.type.includes('word') || /\.(docx|doc)$/i.test(fileName);
+
+    if (!isPdf && !isImage && !isDocx) {
+      setUploadError('Please select a supported file format: PDF, JPG, PNG, or Word (DOCX).');
       return;
     }
 
@@ -221,6 +227,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
             file_size: uploadedFile.file_size,
             sha256_checksum: uploadedFile.sha256_checksum,
             page_count: uploadedFile.page_count,
+            mime_type: uploadedFile.mime_type,
           },
         ],
         items: [
@@ -701,15 +708,15 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       ) : (
         /* Order Creation Flow: Step 1 (Upload) -> Step 2 (Settings) -> Step 3 (Pay) */
         <div className="space-y-6">
-          {/* STEP 1: Upload PDF Card */}
+          {/* STEP 1: Upload Document Card */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-5 sm:p-7">
             <div className="flex items-center space-x-3.5 mb-5">
               <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-600/20">
                 1
               </div>
               <div>
-                <h2 className="font-bold text-slate-900 text-base">Select Document</h2>
-                <p className="text-xs text-slate-500">Upload your PDF file for instant page detection and pricing</p>
+                <h2 className="font-bold text-slate-900 text-base">Select Document or Photo</h2>
+                <p className="text-xs text-slate-500">Upload PDF, JPG, PNG, or Word (DOCX) for instant pricing</p>
               </div>
             </div>
 
@@ -717,7 +724,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
               <label className="border-2 border-dashed border-indigo-200 hover:border-indigo-500 rounded-3xl p-8 sm:p-10 flex flex-col items-center justify-center cursor-pointer bg-indigo-50/20 hover:bg-indigo-50/40 transition-all text-center group">
                 <input
                   type="file"
-                  accept="application/pdf"
+                  accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.doc,application/msword"
                   onChange={handleFileUpload}
                   disabled={uploading || !branchData}
                   className="hidden"
@@ -730,20 +737,56 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                   )}
                 </div>
                 <h3 className="text-sm sm:text-base font-bold text-slate-800">
-                  {uploading ? 'Analyzing PDF & Counting Pages...' : 'Tap to Choose PDF Document'}
+                  {uploading ? 'Analyzing Document & Counting Pages...' : 'Tap to Choose Document or Photo'}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                  Supports standard PDF documents up to 50 MB
+                  Upload file for instant automated page detection & pricing
                 </p>
+
+                <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3.5">
+                  <span className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-[10px] font-bold">
+                    📄 PDF
+                  </span>
+                  <span className="px-2.5 py-1 bg-sky-50 border border-sky-200 text-sky-700 rounded-lg text-[10px] font-bold">
+                    🖼️ JPG / PNG
+                  </span>
+                  <span className="px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-[10px] font-bold">
+                    📝 Word DOCX
+                  </span>
+                  <span className="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px]">
+                    Max 50 MB
+                  </span>
+                </div>
               </label>
             ) : (
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-3">
                 <div className="flex items-center space-x-3.5 overflow-hidden">
-                  <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                    <FileText className="w-6 h-6" />
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                    /\.(jpg|jpeg|png)$/i.test(uploadedFile.original_name)
+                      ? 'bg-sky-100 text-sky-600'
+                      : /\.(docx|doc)$/i.test(uploadedFile.original_name)
+                      ? 'bg-blue-100 text-blue-600'
+                      : 'bg-rose-100 text-rose-600'
+                  }`}>
+                    {/\.(jpg|jpeg|png)$/i.test(uploadedFile.original_name) ? (
+                      <ImageIcon className="w-6 h-6" />
+                    ) : (
+                      <FileText className="w-6 h-6" />
+                    )}
                   </div>
                   <div className="overflow-hidden">
-                    <h4 className="font-bold text-slate-900 text-sm truncate">{uploadedFile.original_name}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-slate-900 text-sm truncate">{uploadedFile.original_name}</h4>
+                      <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                        /\.(jpg|jpeg|png)$/i.test(uploadedFile.original_name)
+                          ? 'bg-sky-100 text-sky-700'
+                          : /\.(docx|doc)$/i.test(uploadedFile.original_name)
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        {/\.(jpg|jpeg|png)$/i.test(uploadedFile.original_name) ? 'Photo' : /\.(docx|doc)$/i.test(uploadedFile.original_name) ? 'DOCX' : 'PDF'}
+                      </span>
+                    </div>
                     <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
                       <span>{(uploadedFile.file_size / (1024 * 1024)).toFixed(2)} MB</span>
                       <span>•</span>

@@ -135,7 +135,8 @@ class PrintWorker {
     }
 
     // Step B: Download file to secure temp directory
-    const tempFilePath = path.join(this.tempDir, `job_${job.id}_${Date.now()}.pdf`);
+    const fileExt = (job.file && job.file.original_filename) ? path.extname(job.file.original_filename) : '.pdf';
+    const tempFilePath = path.join(this.tempDir, `job_${job.id}_${Date.now()}${fileExt || '.pdf'}`);
 
     try {
       const dlRes = await fetch(downloadUrl, {
