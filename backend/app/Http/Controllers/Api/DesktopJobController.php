@@ -272,7 +272,7 @@ class DesktopJobController extends Controller
             'telemetry' => $validated['telemetry'] ?? null,
         ]);
 
-        // If job completed, update parent order status
+        // If job completed, update parent order status and purge cloud document
         if ($status === 'COMPLETED') {
             $allJobsComplete = !PrintJob::where('order_id', $job->order_id)
                 ->where('status', '!=', 'COMPLETED')
@@ -280,6 +280,8 @@ class DesktopJobController extends Controller
 
             if ($allJobsComplete) {
                 $job->order->update(['status' => 'COMPLETED']);
+                // Zero-retention cloud hygiene: permanently delete customer documents immediately
+                $job->order->purgeFiles();
             }
         }
 

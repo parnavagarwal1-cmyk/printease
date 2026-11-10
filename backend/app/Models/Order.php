@@ -59,4 +59,28 @@ class Order extends Model
     {
         return $this->hasMany(PrintJob::class);
     }
+
+    /**
+     * Permanently delete customer documents from cloud storage for privacy & disk hygiene.
+     */
+    public function purgeFiles(): int
+    {
+        $purgedCount = 0;
+        $this->loadMissing('files');
+
+        foreach ($this->files as $file) {
+            if ($file->storage_path && $file->storage_path !== '[PURGED]') {
+                if (\Illuminate\Support\Facades\Storage::disk('local')->exists($file->storage_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('local')->delete($file->storage_path);
+                }
+                $file->update([
+                    'storage_path' => '[PURGED]',
+                    'purged_at' => now(),
+                ]);
+                $purgedCount++;
+            }
+        }
+
+        return $purgedCount;
+    }
 }
