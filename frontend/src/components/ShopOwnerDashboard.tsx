@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleSignInButton } from './GoogleSignInButton';
 import { 
-  DollarSign, 
+  IndianRupee,
   ShoppingBag, 
   Printer, 
   Monitor, 
@@ -18,7 +18,8 @@ import {
   Volume2, 
   QrCode, 
   ShieldCheck, 
-  Trash2 
+  Trash2,
+  TrendingUp
 } from 'lucide-react';
 
 export const ShopOwnerDashboard: React.FC = () => {
@@ -689,171 +690,184 @@ export const ShopOwnerDashboard: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Top Header Bar */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 font-bold text-xl">
-            {branches.find(b => b.id === activeBranchId)?.name?.charAt(0) || 'M'}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">
-                {branches.find(b => b.id === activeBranchId)?.name || 'Main Branch'}
-              </h2>
-              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full uppercase">
-                Active Tenant
-              </span>
+    <div className="max-w-6xl mx-auto space-y-5">
+      {/* Premium Top Header Bar */}
+      <div className="relative bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl shadow-xl overflow-hidden">
+        {/* Subtle grid pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px'}} />
+        <div className="relative p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            {/* Avatar with Google profile photo if available */}
+            <div className="relative">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} className="w-12 h-12 rounded-2xl object-cover ring-2 ring-indigo-500/40 shadow-lg" />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg font-bold text-xl">
+                  {user?.name?.charAt(0) || 'P'}
+                </div>
+              )}
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-900 shadow-sm" title="Active" />
             </div>
-            <p className="text-xs text-slate-500">
-              Logged in as <strong className="text-slate-700">{user?.name}</strong> ({user?.email})
-            </p>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-base font-extrabold text-white tracking-tight">
+                  {user?.name || 'Shop Owner'}
+                </h2>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {user?.email}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          {branches.length > 1 && (
-            <select
-              value={activeBranchId}
-              onChange={(e) => setActiveBranchId(Number(e.target.value))}
-              className="text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-700"
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={fetchBranchData}
+              disabled={loading}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all cursor-pointer border border-white/10"
+              title="Refresh Dashboard"
             >
-              {branches.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          )}
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
 
-          <button
-            onClick={fetchBranchData}
-            disabled={loading}
-            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
-            title="Refresh Dashboard"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
+            <button
+              onClick={handleLogout}
+              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-rose-500/30 border border-white/10 hover:border-rose-500/40 text-white/70 hover:text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* Metrics Row — Premium Cards */}
       {analytics && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold">Today's Revenue</span>
-              <DollarSign className="w-4 h-4 text-emerald-600" />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+          {/* Revenue Card — accent */}
+          <div className="relative bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-2xl shadow-lg shadow-emerald-500/20 overflow-hidden col-span-2 md:col-span-1">
+            <div className="absolute right-3 top-3 opacity-10">
+              <IndianRupee className="w-16 h-16" />
             </div>
-            <div className="text-2xl font-black text-slate-900">₹{analytics.revenue_today.toFixed(2)}</div>
-            <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">Live collected</span>
+            <div className="relative">
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-100" />
+                <span className="text-[11px] font-bold text-emerald-100 uppercase tracking-wide">Today's Revenue</span>
+              </div>
+              <div className="text-2xl font-black text-white mt-1">₹{analytics.revenue_today.toFixed(2)}</div>
+              <span className="text-[11px] text-emerald-100/80 font-medium mt-1 block">Live collected</span>
+            </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold">Orders Today</span>
+          {/* Orders Card */}
+          <div className="relative bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="absolute right-3 top-3 w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
               <ShoppingBag className="w-4 h-4 text-indigo-600" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{analytics.orders_today_count}</div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Orders Today</span>
+            <div className="text-2xl font-black text-slate-900 mt-1">{analytics.orders_today_count}</div>
             <span className="text-[11px] text-slate-400 mt-1 block">Customer uploads</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold">Completed Prints</span>
+          {/* Completed Prints */}
+          <div className="relative bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="absolute right-3 top-3 w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{analytics.completed_prints_today}</div>
-            <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">Spooled successfully</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Completed</span>
+            <div className="text-2xl font-black text-slate-900 mt-1">{analytics.completed_prints_today}</div>
+            <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">Prints spooled</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold">Active Printers</span>
-              <Printer className="w-4 h-4 text-indigo-600" />
+          {/* Active Printers */}
+          <div className="relative bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="absolute right-3 top-3 w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center">
+              <Printer className="w-4 h-4 text-violet-600" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{analytics.active_printers_count}</div>
-            <span className="text-[11px] text-slate-500 mt-1 block">Branch hardware</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Printers</span>
+            <div className="text-2xl font-black text-slate-900 mt-1">{analytics.active_printers_count}</div>
+            <span className="text-[11px] text-slate-400 mt-1 block">Branch hardware</span>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm col-span-2 md:col-span-1">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-semibold">Windows Agents</span>
-              <Monitor className="w-4 h-4 text-indigo-600" />
+          {/* Windows Agents */}
+          <div className="relative bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="absolute right-3 top-3 w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center">
+              <Monitor className="w-4 h-4 text-sky-600" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{devices.length}</div>
-            <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Agents</span>
+            <div className="text-2xl font-black text-slate-900 mt-1">{devices.length}</div>
+            <span className={`text-[11px] font-semibold mt-1 block ${devices.filter(d => d.status === 'online').length > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
               {devices.filter(d => d.status === 'online').length} online
             </span>
           </div>
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+      {/* Navigation Tabs — Premium pill style */}
+      <div className="bg-slate-100/80 p-1.5 rounded-2xl flex gap-1 overflow-x-auto backdrop-blur-sm">
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 ${
             activeTab === 'analytics'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-white text-slate-900 shadow-sm shadow-slate-200'
+              : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Recent Orders ({orders.length})
+          Recent Orders {orders.length > 0 && <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === 'analytics' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-500'}`}>{orders.length}</span>}
         </button>
 
         <button
           onClick={() => setActiveTab('pricing')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 ${
             activeTab === 'pricing'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-white text-slate-900 shadow-sm shadow-slate-200'
+              : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Pricing Configuration
+          Pricing
         </button>
 
         <button
           onClick={() => setActiveTab('payments')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
             activeTab === 'payments'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-white text-slate-900 shadow-sm shadow-slate-200'
+              : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           <Wallet className="w-3.5 h-3.5" />
-          <span>UPI & Online Payments</span>
+          <span>UPI & Payments</span>
           {!merchantVpa && (
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="UPI ID not set"></span>
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="UPI ID not set" />
           )}
         </button>
 
         <button
           onClick={() => setActiveTab('poster')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
             activeTab === 'poster'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-white text-slate-900 shadow-sm shadow-slate-200'
+              : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Printable QR Poster
+          <QrCode className="w-3.5 h-3.5" />
+          QR Poster
         </button>
 
         <button
           onClick={() => setActiveTab('hardware')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0 ${
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
             activeTab === 'hardware'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-white text-slate-900 shadow-sm shadow-slate-200'
+              : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          Hardware & Windows Agents
+          <Monitor className="w-3.5 h-3.5" />
+          Hardware & Agents
         </button>
       </div>
 
