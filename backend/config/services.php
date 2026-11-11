@@ -41,4 +41,9 @@ return [
         'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET', 'mock_webhook_secret_abc123'),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+    ],
+
 ];

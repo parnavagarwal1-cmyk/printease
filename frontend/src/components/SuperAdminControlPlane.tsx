@@ -6,22 +6,19 @@ import {
   CheckCircle2, 
   AlertCircle, 
   RefreshCw, 
-  LogIn, 
   LogOut, 
   Layers,
   Trash2,
   Lock,
   KeyRound
 } from 'lucide-react';
+import { GoogleSignInButton } from './GoogleSignInButton';
 
 export const SuperAdminControlPlane: React.FC = () => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('printease_admin_token'));
   const [user, setUser] = useState<any | null>(null);
 
-  // Login form
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loggingIn, setLoggingIn] = useState(false);
+  // Login error state
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Admin Data
@@ -109,43 +106,24 @@ export const SuperAdminControlPlane: React.FC = () => {
     }
   }, [token, fetchAdminUser, fetchAdminData]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoggingIn(true);
-    setLoginError(null);
-
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      if (data.user.role !== 'super_admin') {
-        throw new Error('Access denied: This account is not a Super Administrator.');
-      }
-
-      localStorage.setItem('printease_admin_token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-      setAdminName(data.user.name || '');
-      setAdminEmail(data.user.email || '');
-    } catch (err: any) {
-      setLoginError(err.message || 'Login failed.');
-    } finally {
-      setLoggingIn(false);
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem('printease_admin_token');
     setToken(null);
     setUser(null);
+  };
+
+  const handleGoogleAdminSuccess = (data: { token: string; user: any }) => {
+    if (data.user.role !== 'super_admin') {
+      setLoginError(`Access denied: ${data.user.email} is not authorized as Super Administrator. Platform root access is restricted to parnavagarwal1@gmail.com.`);
+      return;
+    }
+
+    localStorage.setItem('printease_admin_token', data.token);
+    setToken(data.token);
+    setUser(data.user);
+    setAdminName(data.user.name || '');
+    setAdminEmail(data.user.email || '');
+    setLoginError(null);
   };
 
   const handleToggleShopStatus = async (shopId: number, currentStatus: string) => {
@@ -246,36 +224,23 @@ export const SuperAdminControlPlane: React.FC = () => {
 
   if (!token || !user) {
     return (
-      <div className="max-w-md mx-auto my-12 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-900 px-6 py-6 text-white text-center">
-          <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center mx-auto mb-3">
-            <ShieldCheck className="w-6 h-6 text-white" />
+      <div className="max-w-md mx-auto my-12 bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 px-6 py-8 text-white text-center">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-600/30">
+            <ShieldCheck className="w-7 h-7 text-white" />
           </div>
-          <h2 className="text-xl font-bold">Super Admin Control Plane</h2>
-          <p className="text-xs text-slate-400 mt-1">Platform-wide multi-shop governance and telemetry</p>
+          <h2 className="text-xl font-extrabold tracking-tight">Super Admin Control Plane</h2>
+          <p className="text-xs text-slate-300 mt-1 max-w-xs mx-auto">
+            Platform-wide multi-shop governance, telemetry & billing management
+          </p>
         </div>
 
-        <form onSubmit={handleLogin} className="p-6 space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Admin Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200"
-            />
+        <div className="p-8 space-y-6">
+          <div className="text-center space-y-1">
+            <h3 className="font-bold text-sm text-slate-900">Sign in with Google</h3>
+            <p className="text-xs text-slate-500">
+              Restricted exclusively to authorized platform administrators
+            </p>
           </div>
 
           {loginError && (
@@ -285,15 +250,19 @@ export const SuperAdminControlPlane: React.FC = () => {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loggingIn}
-            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {loggingIn ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-            <span>Sign In to Super Admin</span>
-          </button>
-        </form>
+          <GoogleSignInButton
+            onSuccess={handleGoogleAdminSuccess}
+            buttonText="signin_with"
+            roleHint="super_admin"
+          />
+
+          <div className="pt-2 border-t border-slate-100">
+            <div className="flex items-start gap-2.5 text-[11px] text-slate-500">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>Root access protected by Google Identity Services & role-based verification.</span>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

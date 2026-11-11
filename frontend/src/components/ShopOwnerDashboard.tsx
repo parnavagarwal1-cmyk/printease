@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { GoogleSignInButton } from './GoogleSignInButton';
 import { 
-  Building2, 
   DollarSign, 
   ShoppingBag, 
   Printer, 
@@ -11,47 +11,20 @@ import {
   Check, 
   CheckCircle2, 
   AlertCircle, 
-  LogIn, 
-  LogOut,
-  Store,
-  UserPlus,
-  Sparkles,
-  MapPin,
-  Phone,
-  Mail,
-  User as UserIcon,
-  Wallet,
-  Volume2,
-  QrCode,
-  ShieldCheck,
-  Trash2
+  LogOut, 
+  Store, 
+  Sparkles, 
+  Wallet, 
+  Volume2, 
+  QrCode, 
+  ShieldCheck, 
+  Trash2 
 } from 'lucide-react';
 
 export const ShopOwnerDashboard: React.FC = () => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('printease_token'));
   const [user, setUser] = useState<any | null>(null);
   
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loggingIn, setLoggingIn] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-
-  // Auth Mode: login vs register
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-
-  // Register form state
-  const [regName, setRegName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regPasswordConfirm, setRegPasswordConfirm] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regShopName, setRegShopName] = useState('');
-  const [regBranchName, setRegBranchName] = useState('Main Branch');
-  const [regCity, setRegCity] = useState('');
-  const [registering, setRegistering] = useState(false);
-  const [registerError, setRegisterError] = useState<string | null>(null);
-
   // Add Branch modal state
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
@@ -224,34 +197,6 @@ export const ShopOwnerDashboard: React.FC = () => {
     }
   }, [token, activeBranchId, fetchBranchData]);
 
-  // 3. Handle Login
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoggingIn(true);
-    setLoginError(null);
-
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'Login failed.');
-      }
-
-      localStorage.setItem('printease_token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-    } catch (err: any) {
-      setLoginError(err.message || 'Login failed.');
-    } finally {
-      setLoggingIn(false);
-    }
-  };
-
   const handleLogout = async () => {
     if (token) {
       await fetch('/api/auth/logout', {
@@ -264,51 +209,16 @@ export const ShopOwnerDashboard: React.FC = () => {
     setUser(null);
   };
 
-  // Register New Shop & Owner
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (regPassword !== regPasswordConfirm) {
-      setRegisterError('Passwords do not match.');
-      return;
-    }
-    if (regPassword.length < 8) {
-      setRegisterError('Password must be at least 8 characters long.');
-      return;
-    }
-    setRegistering(true);
-    setRegisterError(null);
-
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          name: regName,
-          email: regEmail,
-          password: regPassword,
-          password_confirmation: regPasswordConfirm,
-          phone: regPhone || undefined,
-          shop_name: regShopName,
-          branch_name: regBranchName || 'Main Branch',
-          city: regCity || undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMsg = data.errors 
-          ? Object.values(data.errors).flat().join(' ') 
-          : (data.message || 'Registration failed.');
-        throw new Error(errorMsg);
+  const handleGoogleAuthSuccess = (data: { token: string; user: any; shops?: any[] }) => {
+    localStorage.setItem('printease_token', data.token);
+    setToken(data.token);
+    setUser(data.user);
+    if (data.shops && data.shops.length > 0) {
+      const allBranches = data.shops.flatMap((s: any) => s.branches || []);
+      if (allBranches.length > 0) {
+        setBranches(allBranches);
+        setActiveBranchId(allBranches[0].id);
       }
-
-      localStorage.setItem('printease_token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-    } catch (err: any) {
-      setRegisterError(err.message || 'Registration failed.');
-    } finally {
-      setRegistering(false);
     }
   };
 
@@ -736,266 +646,44 @@ export const ShopOwnerDashboard: React.FC = () => {
 
   if (!token) {
     return (
-      <div className="max-w-lg mx-auto my-10 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="max-w-md mx-auto my-12 bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
         {/* Card Header */}
-        <div className="bg-slate-900 px-6 py-6 text-white text-center">
-          <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-md shadow-indigo-600/30">
-            {authMode === 'login' ? <Building2 className="w-6 h-6" /> : <Store className="w-6 h-6" />}
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 px-6 py-8 text-white text-center">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-600/30">
+            <Store className="w-7 h-7 text-white" />
           </div>
           <h2 className="text-xl font-extrabold tracking-tight">PrintEase Shop Portal</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            {authMode === 'login'
-              ? 'Sign in to access your print counters, queues & pricing rules'
-              : 'Register your print shop & launch customer self-service QR in seconds'}
+          <p className="text-xs text-slate-300 mt-1 max-w-xs mx-auto">
+            Autonomous self-service printing kiosk management & live counter queues
           </p>
         </div>
 
-        {/* Tab Switcher: Sign In vs Register New Shop */}
-        <div className="flex border-b border-slate-200 bg-slate-50/70 p-1.5 gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode('login');
-              setLoginError(null);
-            }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              authMode === 'login'
-                ? 'bg-white text-indigo-700 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Sign In</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode('register');
-              setRegisterError(null);
-            }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              authMode === 'register'
-                ? 'bg-white text-indigo-700 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Register New Shop</span>
-          </button>
+        {/* Google Authentication Only */}
+        <div className="p-8 space-y-6">
+          <div className="text-center space-y-1">
+            <h3 className="font-bold text-sm text-slate-900">Sign in with Google</h3>
+            <p className="text-xs text-slate-500">
+              Platform access is restricted strictly to verified Google accounts
+            </p>
+          </div>
+
+          <GoogleSignInButton
+            onSuccess={handleGoogleAuthSuccess}
+            buttonText="continue_with"
+            roleHint="shop_owner"
+          />
+
+          <div className="pt-2 border-t border-slate-100 space-y-2.5">
+            <div className="flex items-start gap-2.5 text-[11px] text-slate-500">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>Secure passwordless access protected by Google Identity Services.</span>
+            </div>
+            <div className="flex items-start gap-2.5 text-[11px] text-slate-500">
+              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <span>New shop owners get automated counter setup, A4/A3 pricing rules, and printable QR poster.</span>
+            </div>
+          </div>
         </div>
-
-        {/* MODE 1: Login Form */}
-        {authMode === 'login' ? (
-          <form onSubmit={handleLogin} className="p-6 space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Email Address</label>
-              <input
-                type="email"
-                required
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700">Password</label>
-              <input
-                type="password"
-                required
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              />
-            </div>
-
-            {loginError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loggingIn}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-            >
-              {loggingIn ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <LogIn className="w-4 h-4" />
-              )}
-              <span>Sign In to Dashboard</span>
-            </button>
-
-            <div className="text-center pt-2">
-              <button
-                type="button"
-                onClick={() => setAuthMode('register')}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
-              >
-                Don't have a shop account? Register your shop →
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* MODE 2: Register New Shop Form */
-          <form onSubmit={handleRegister} className="p-6 space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Store className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Shop / Business Name *</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Apex Xerox & Print Hub"
-                value={regShopName}
-                onChange={(e) => setRegShopName(e.target.value)}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Owner Full Name *</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Rahul Sharma"
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Phone / WhatsApp</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. +91 98765 43210"
-                  value={regPhone}
-                  onChange={(e) => setRegPhone(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-slate-500" />
-                <span>Login Email Address *</span>
-              </label>
-              <input
-                type="email"
-                required
-                placeholder="e.g. rahul@apexprint.in"
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Initial Branch / Counter</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Main Counter"
-                  value={regBranchName}
-                  onChange={(e) => setRegBranchName(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                  <span>City</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. New Delhi"
-                  value={regCity}
-                  onChange={(e) => setRegCity(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Password (min 8 chars) *</label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">Confirm Password *</label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={regPasswordConfirm}
-                  onChange={(e) => setRegPasswordConfirm(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            {registerError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{registerError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={registering}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-            >
-              {registering ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Configuring Shop & Generating QR...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-indigo-200" />
-                  <span>Register Shop & Launch Counter</span>
-                </>
-              )}
-            </button>
-
-            <div className="text-[11px] text-slate-400 text-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-              ✨ Automatically configures your shop, branch counter, default A4/A3 pricing rules, and printable customer QR poster.
-            </div>
-
-            <div className="text-center pt-1">
-              <button
-                type="button"
-                onClick={() => setAuthMode('login')}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
-              >
-                Already have an account? Sign in here →
-              </button>
-            </div>
-          </form>
-        )}
       </div>
     );
   }
