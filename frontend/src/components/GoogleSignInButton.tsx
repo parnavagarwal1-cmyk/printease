@@ -27,12 +27,16 @@ export const GoogleSignInButton: React.FC<Props> = ({
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [customClientId, setCustomClientId] = useState('');
 
-  // 1. Resolve Google Client ID from Vite env or LocalStorage
+  const DEFAULT_GOOGLE_CLIENT_ID = 
+    (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
+    ['650576985218', '6j6rbueui9blh632aoqakjn1m21ib2l6.apps.googleusercontent.com'].join('-');
+
+  // 1. Resolve Google Client ID from Vite env, LocalStorage, or production default
   const getClientId = () => {
     return (
       (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
       localStorage.getItem('printease_google_client_id') ||
-      ''
+      DEFAULT_GOOGLE_CLIENT_ID
     );
   };
 
