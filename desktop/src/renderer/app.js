@@ -126,6 +126,11 @@ async function loadAppInfo() {
       if (subEl) subEl.textContent = branchDisplay;
       if (infoBranch) infoBranch.textContent = branchDisplay;
     }
+
+    const infoPrinter = document.getElementById('info-selected-printer');
+    if (infoPrinter && config) {
+      infoPrinter.textContent = config.selectedPrinter || 'Default Windows Printer';
+    }
   } catch (err) {
     console.error('Failed to get app version:', err);
   }
@@ -178,6 +183,8 @@ async function scanPrinters() {
   container.innerHTML = '<div style="color:#64748B; font-size:12px;">Enumerating Windows printers...</div>';
 
   try {
+    const config = await window.electronAPI.getDeviceConfig();
+    const currentSelected = (config && config.selectedPrinter) ? config.selectedPrinter : null;
     const printers = await window.electronAPI.getPrinters();
     countLabel.textContent = printers.length;
 
@@ -186,16 +193,41 @@ async function scanPrinters() {
       return;
     }
 
+    // Determine effectively active printer
+    const activePrinterName = currentSelected || (printers.find(p => p.isDefault)?.name) || printers[0].name;
+
+    const banner = document.getElementById('selected-printer-banner');
+    if (banner) {
+      banner.style.display = 'flex';
+      banner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:15px;">🖨️</span>
+          <span>Active Spooler Hardware: <strong style="color:#1E1B4B; font-weight:700;">${escapeHtml(activePrinterName)}</strong></span>
+        </div>
+        <span class="badge badge-success" style="font-size:11px; padding:3px 10px;">Ready for Auto-Spooling</span>
+      `;
+    }
+
     container.innerHTML = '';
     printers.forEach(printer => {
+      const isSelected = (currentSelected ? currentSelected === printer.name : Boolean(printer.isDefault));
       const card = document.createElement('div');
-      card.className = 'printer-card';
+      card.className = `printer-card ${isSelected ? 'selected' : ''}`;
       card.innerHTML = `
         <div>
-          <div class="printer-info-name">${escapeHtml(printer.name)} ${printer.isDefault ? '<span class="badge badge-success" style="margin-left:6px;">Default</span>' : ''}</div>
+          <div class="printer-info-name" style="display:flex; align-items:center; gap:6px;">
+            <span style="font-weight:700; color:${isSelected ? '#1E1B4B' : '#0F172A'};">${escapeHtml(printer.name)}</span>
+            ${printer.isDefault ? '<span class="badge badge-success" style="font-size:10px;">Default</span>' : ''}
+            ${isSelected ? '<span class="badge badge-primary" style="font-size:10px; font-weight:700;">✓ Active Spooler</span>' : ''}
+          </div>
           <div class="printer-info-detail">${escapeHtml(printer.displayName || printer.description || 'System Printer')}</div>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="selectPrinter('${escapeHtml(printer.name)}')">Select</button>
+        <div>
+          ${isSelected 
+            ? '<button class="btn btn-sm" style="background:#10B981; color:white; border:none; cursor:default; font-weight:600; padding:6px 14px; border-radius:6px;" disabled>✓ Selected</button>'
+            : `<button class="btn btn-secondary btn-sm" style="cursor:pointer; padding:6px 14px; border-radius:6px;" onclick="selectPrinter('${escapeHtml(printer.name)}')">Select</button>`
+          }
+        </div>
       `;
       container.appendChild(card);
     });
@@ -263,8 +295,21 @@ function createJobElement(job) {
   return div;
 }
 
-window.selectPrinter = function(printerName) {
-  alert(`Selected default printer: ${printerName}`);
+window.selectPrinter = async function(printerName) {
+  try {
+    const res = await window.electronAPI.saveDeviceConfig({ selectedPrinter: printerName });
+    if (res && res.success) {
+      await scanPrinters();
+      
+      const infoPrinter = document.getElementById('info-selected-printer');
+      if (infoPrinter) {
+        infoPrinter.textContent = printerName;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to select printer:', err);
+    alert('Failed to select printer: ' + err.message);
+  }
 };
 
 function escapeHtml(str) {
