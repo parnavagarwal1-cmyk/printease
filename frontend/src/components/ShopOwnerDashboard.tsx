@@ -121,76 +121,84 @@ export const ShopOwnerDashboard: React.FC = () => {
     try {
       const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' };
 
-      // A: Analytics
-      const anRes = await fetch(`/api/branches/${activeBranchId}/analytics`, { headers });
-      if (anRes.ok) {
-        const anData = await anRes.json();
-        setAnalytics(anData.analytics);
+      // In silent mode (fast real-time polling), only fetch Orders & Analytics for instant updates
+      const tasks: Promise<any>[] = [
+        fetch(`/api/branches/${activeBranchId}/orders`, { headers }).then(async (res) => {
+          if (res.ok) {
+            const ordData = await res.json();
+            setOrders(ordData.orders || []);
+          }
+        }),
+        fetch(`/api/branches/${activeBranchId}/analytics`, { headers }).then(async (res) => {
+          if (res.ok) {
+            const anData = await res.json();
+            setAnalytics(anData.analytics);
+          }
+        }),
+      ];
+
+      // Only fetch heavy static branch details on initial load or manual refresh
+      if (!silent) {
+        tasks.push(
+          fetch(`/api/branches/${activeBranchId}`, { headers }).then(async (res) => {
+            if (res.ok) {
+              const brData = await res.json();
+              const rawRules = brData.branch?.pricing_rules || [];
+              const hasA4 = rawRules.some((r: any) => r.paper_size?.toUpperCase() === 'A4');
+              const hasA3 = rawRules.some((r: any) => r.paper_size?.toUpperCase() === 'A3');
+              const merged = [...rawRules];
+              if (!hasA4) {
+                merged.push({
+                  paper_size: 'A4',
+                  bw_single_price: 2.0,
+                  bw_duplex_price: 3.0,
+                  color_single_price: 10.0,
+                  color_duplex_price: 18.0,
+                  duplex_pricing_mode: 'per_side',
+                  min_order_amount: 5.0,
+                  tax_rate_percent: 0.0,
+                  is_active: true,
+                });
+              }
+              if (!hasA3) {
+                merged.push({
+                  paper_size: 'A3',
+                  bw_single_price: 5.0,
+                  bw_duplex_price: 8.0,
+                  color_single_price: 25.0,
+                  color_duplex_price: 45.0,
+                  duplex_pricing_mode: 'per_side',
+                  min_order_amount: 10.0,
+                  tax_rate_percent: 0.0,
+                  is_active: false,
+                });
+              }
+              setPricingRules(merged.map((r: any) => ({ ...r, is_active: r.is_active !== false })));
+              setPrinters(brData.branch?.printers || []);
+              setDevices(brData.branch?.desktop_devices || []);
+              if (brData.branch) {
+                setDefaultPaperSize(brData.branch.default_paper_size || 'A4');
+                setMerchantVpa(brData.branch.merchant_vpa || '');
+                setMerchantName(brData.branch.merchant_name || brData.branch.name || '');
+                setSoundboxProvider(brData.branch.soundbox_provider || 'paytm');
+              }
+            }
+          }),
+          fetch(`/api/branches/${activeBranchId}/qr-poster`, { headers }).then(async (res) => {
+            if (res.ok) {
+              const posData = await res.json();
+              setPosterData(posData.poster);
+            }
+          })
+        );
       }
 
-      // B: Orders
-      const ordRes = await fetch(`/api/branches/${activeBranchId}/orders`, { headers });
-      if (ordRes.ok) {
-        const ordData = await ordRes.json();
-        setOrders(ordData.orders || []);
-      }
-
-      // C: Branch Details (Printers, Pricing, Devices, UPI Payment Settings)
-      const brRes = await fetch(`/api/branches/${activeBranchId}`, { headers });
-      if (brRes.ok) {
-        const brData = await brRes.json();
-        const rawRules = brData.branch?.pricing_rules || [];
-        const hasA4 = rawRules.some((r: any) => r.paper_size?.toUpperCase() === 'A4');
-        const hasA3 = rawRules.some((r: any) => r.paper_size?.toUpperCase() === 'A3');
-        const merged = [...rawRules];
-        if (!hasA4) {
-          merged.push({
-            paper_size: 'A4',
-            bw_single_price: 2.0,
-            bw_duplex_price: 3.0,
-            color_single_price: 10.0,
-            color_duplex_price: 18.0,
-            duplex_pricing_mode: 'per_side',
-            min_order_amount: 5.0,
-            tax_rate_percent: 0.0,
-            is_active: true,
-          });
-        }
-        if (!hasA3) {
-          merged.push({
-            paper_size: 'A3',
-            bw_single_price: 5.0,
-            bw_duplex_price: 8.0,
-            color_single_price: 25.0,
-            color_duplex_price: 45.0,
-            duplex_pricing_mode: 'per_side',
-            min_order_amount: 10.0,
-            tax_rate_percent: 0.0,
-            is_active: false,
-          });
-        }
-        setPricingRules(merged.map((r: any) => ({ ...r, is_active: r.is_active !== false })));
-        setPrinters(brData.branch?.printers || []);
-        setDevices(brData.branch?.desktop_devices || []);
-        if (brData.branch) {
-          setDefaultPaperSize(brData.branch.default_paper_size || 'A4');
-          setMerchantVpa(brData.branch.merchant_vpa || '');
-          setMerchantName(brData.branch.merchant_name || brData.branch.name || '');
-          setSoundboxProvider(brData.branch.soundbox_provider || 'paytm');
-        }
-      }
-
-      // D: QR Poster Data
-      const posRes = await fetch(`/api/branches/${activeBranchId}/qr-poster`, { headers });
-      if (posRes.ok) {
-        const posData = await posRes.json();
-        setPosterData(posData.poster);
-      }
+      await Promise.all(tasks);
       setLastRefreshed(new Date());
     } catch (err) {
       console.error('Branch data error:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [token, activeBranchId]);
 
@@ -200,13 +208,28 @@ export const ShopOwnerDashboard: React.FC = () => {
     }
   }, [token, activeBranchId, fetchBranchData]);
 
-  // Auto-refresh every 10 seconds for live order/analytics updates
+  // Real-time live polling (every 2.5s) + instant refresh on window focus
   useEffect(() => {
     if (!token || !activeBranchId) return;
+
+    // Fast 2.5 second polling for instant reflection of new orders
     const interval = setInterval(() => {
-      fetchBranchData(true); // silent = true, no loading spinner
-    }, 10000);
-    return () => clearInterval(interval);
+      fetchBranchData(true);
+    }, 2500);
+
+    // Instant refresh when user switches tabs or window gains focus
+    const handleFocus = () => {
+      fetchBranchData(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, [token, activeBranchId, fetchBranchData]);
 
   const handleLogout = async () => {
@@ -890,7 +913,7 @@ export const ShopOwnerDashboard: React.FC = () => {
               <h3 className="font-bold text-sm text-slate-900">Live Customer Orders</h3>
               <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Auto-sync every 10s
+                ⚡ Live Sync (Instant)
               </span>
             </div>
             <span className="text-[11px] text-slate-400">
