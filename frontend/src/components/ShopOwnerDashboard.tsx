@@ -42,6 +42,7 @@ export const ShopOwnerDashboard: React.FC = () => {
   const [printers, setPrinters] = useState<any[]>([]);
   const [devices, setDevices] = useState<any[]>([]);
   const [posterData, setPosterData] = useState<any | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   // UI state
   const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'pricing' | 'payments' | 'poster' | 'hardware'>('analytics');
@@ -113,9 +114,9 @@ export const ShopOwnerDashboard: React.FC = () => {
   }, [token, fetchCurrentUser, fetchBranches]);
 
   // 2. Fetch Branch-Specific Data
-  const fetchBranchData = useCallback(async () => {
+  const fetchBranchData = useCallback(async (silent = false) => {
     if (!token || !activeBranchId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
 
     try {
       const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' };
@@ -185,6 +186,7 @@ export const ShopOwnerDashboard: React.FC = () => {
         const posData = await posRes.json();
         setPosterData(posData.poster);
       }
+      setLastRefreshed(new Date());
     } catch (err) {
       console.error('Branch data error:', err);
     } finally {
@@ -196,6 +198,15 @@ export const ShopOwnerDashboard: React.FC = () => {
     if (token && activeBranchId) {
       fetchBranchData();
     }
+  }, [token, activeBranchId, fetchBranchData]);
+
+  // Auto-refresh every 10 seconds for live order/analytics updates
+  useEffect(() => {
+    if (!token || !activeBranchId) return;
+    const interval = setInterval(() => {
+      fetchBranchData(true); // silent = true, no loading spinner
+    }, 10000);
+    return () => clearInterval(interval);
   }, [token, activeBranchId, fetchBranchData]);
 
   const handleLogout = async () => {
@@ -726,7 +737,7 @@ export const ShopOwnerDashboard: React.FC = () => {
 
           <div className="flex items-center gap-2.5">
             <button
-              onClick={fetchBranchData}
+              onClick={() => fetchBranchData(false)}
               disabled={loading}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all cursor-pointer border border-white/10"
               title="Refresh Dashboard"
@@ -873,10 +884,18 @@ export const ShopOwnerDashboard: React.FC = () => {
 
       {/* Tab 1: Orders Table */}
       {activeTab === 'analytics' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-bold text-sm text-slate-900">Live Customer Orders</h3>
-            <span className="text-xs text-slate-500">Auto-synced</span>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-slate-900">Live Customer Orders</h3>
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Auto-sync every 10s
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400">
+              {lastRefreshed ? `Updated ${lastRefreshed.toLocaleTimeString('en-IN', {hour: '2-digit', minute: '2-digit', second: '2-digit'})}` : 'Loading...'}
+            </span>
           </div>
 
           <div className="overflow-x-auto">
