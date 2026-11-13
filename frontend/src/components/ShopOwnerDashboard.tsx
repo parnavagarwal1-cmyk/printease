@@ -355,9 +355,24 @@ export const ShopOwnerDashboard: React.FC = () => {
       return;
     }
 
-    if (razorpayEnabled && !razorpayKeyId.trim()) {
-      setPaymentSaveError('Please enter your Razorpay Key ID (e.g. rzp_live_... or rzp_test_...).');
-      return;
+    if (razorpayEnabled) {
+      const cleanKey = razorpayKeyId.trim();
+      const cleanSecret = razorpayKeySecret.trim();
+
+      if (!cleanKey) {
+        setPaymentSaveError('Please enter your Razorpay Key ID (e.g. rzp_live_... or rzp_test_...).');
+        return;
+      }
+
+      if (!cleanKey.startsWith('rzp_test_') && !cleanKey.startsWith('rzp_live_')) {
+        setPaymentSaveError("Invalid Key ID! Razorpay keys must start with 'rzp_test_' or 'rzp_live_'. Please copy it from your Razorpay Dashboard (Settings > API Keys), not Google Cloud.");
+        return;
+      }
+
+      if (!cleanSecret) {
+        setPaymentSaveError('Please enter your Razorpay Key Secret from your Razorpay Dashboard.');
+        return;
+      }
     }
 
     setSavingPayments(true);

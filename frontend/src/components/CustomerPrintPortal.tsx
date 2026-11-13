@@ -297,12 +297,13 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       }
 
       const initData = await initRes.json();
-      const rzpOrderId = initData.razorpay.razorpay_order_id;
-      const isMock = !initData.razorpay?.key_id || initData.razorpay.key_id.includes('mock');
+      const rzpOrderId = initData.razorpay?.razorpay_order_id;
+      const keyId = initData.razorpay?.key_id;
+      const isMock = Boolean(initData.razorpay?.is_mock) || !keyId || keyId.includes('mock');
 
-      if (!isMock && typeof (window as any).Razorpay !== 'undefined') {
+      if (!isMock && rzpOrderId && typeof (window as any).Razorpay !== 'undefined') {
         const options = {
-          key: initData.razorpay.key_id,
+          key: keyId,
           amount: initData.razorpay.amount,
           currency: initData.razorpay.currency || 'INR',
           name: branchData?.shop?.name || 'PrintEase',
@@ -350,11 +351,20 @@ export const CustomerPrintPortal: React.FC<Props> = ({
         };
 
         const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (resp: any) {
+          setPaying(false);
+          const failMsg = resp.error?.description || resp.error?.reason || 'Payment failed.';
+          setPaymentError(`Payment failed: ${failMsg}`);
+        });
         rzp.open();
         return;
       }
 
-      throw new Error('Online card gateway is currently unavailable. Please scan the Shop Soundbox / UPI QR above to pay directly.');
+      if (isMock) {
+        throw new Error('Razorpay gateway is not configured with active merchant credentials yet. Please pay using the Shop Soundbox / UPI QR above.');
+      }
+
+      throw new Error('Online gateway is currently unavailable. Please scan the Shop Soundbox / UPI QR above to pay directly.');
     } catch (err: any) {
       setPaymentError(err.message || 'Payment processing failed.');
     } finally {

@@ -31,17 +31,28 @@ class RazorpayPaymentService
     public function getCredentialsForOrder(Order $order): array
     {
         $branch = $order->branch ?? ($order->relationLoaded('branch') ? $order->branch : $order->branch()->first());
-        if ($branch && $branch->razorpay_enabled && !empty($branch->razorpay_key_id) && !empty($branch->razorpay_key_secret)) {
+        if ($branch && $branch->razorpay_enabled) {
+            $keyId = trim($branch->razorpay_key_id ?? '');
+            $keySecret = trim($branch->razorpay_key_secret ?? '');
+
+            if (empty($keyId) || empty($keySecret)) {
+                throw new \RuntimeException('Shop has enabled Razorpay but Key ID or Secret is missing in shop settings.');
+            }
+
+            if (!str_starts_with($keyId, 'rzp_test_') && !str_starts_with($keyId, 'rzp_live_')) {
+                throw new \RuntimeException("Invalid Key ID format. Razorpay Key ID must start with 'rzp_test_' or 'rzp_live_'. Please check shop settings.");
+            }
+
             return [
-                'key_id' => $branch->razorpay_key_id,
-                'key_secret' => $branch->razorpay_key_secret,
+                'key_id' => $keyId,
+                'key_secret' => $keySecret,
                 'is_custom' => true,
             ];
         }
 
         return [
-            'key_id' => $this->keyId,
-            'key_secret' => $this->keySecret,
+            'key_id' => trim($this->keyId),
+            'key_secret' => trim($this->keySecret),
             'is_custom' => false,
         ];
     }
@@ -64,7 +75,12 @@ class RazorpayPaymentService
             ->latest()
             ->first();
 
-        if ($existingPayment) {
+        $isMockResponse = $existingPayment && (
+            ($existingPayment->gateway_response['mock'] ?? false) ||
+            !empty($existingPayment->gateway_response['error'])
+        );
+
+        if ($existingPayment && !$isMockResponse) {
             return [
                 'razorpay_order_id' => $existingPayment->razorpay_order_id,
                 'key_id' => $keyId,
@@ -74,24 +90,32 @@ class RazorpayPaymentService
                 'customer_name' => $order->customer_name,
                 'customer_phone' => $order->customer_phone,
                 'customer_email' => $order->customer_email,
+                'is_mock' => false,
             ];
+        }
+
+        // Clean up previous failed/mock attempt so fresh real order can be created
+        if ($existingPayment && $isMockResponse) {
+            $existingPayment->delete();
         }
 
         $razorpayOrderId = null;
         $gatewayResponse = null;
+        $isMock = false;
 
-        // If configured with live/real Razorpay test credentials
+        // If configured with real Razorpay credentials
         if (!str_contains($keyId, 'mock') && !empty($keySecret)) {
             try {
                 $response = Http::withBasicAuth($keyId, $keySecret)
+                    ->timeout(10)
                     ->post('https://api.razorpay.com/v1/orders', [
                         'amount' => $amountInPaise,
                         'currency' => 'INR',
-                        'receipt' => $order->order_number,
+                        'receipt' => substr($order->order_number, 0, 40),
                         'notes' => [
-                            'order_id' => $order->id,
-                            'branch_id' => $order->branch_id,
-                            'customer_phone' => $order->customer_phone,
+                            'order_id' => (string) $order->id,
+                            'branch_id' => (string) $order->branch_id,
+                            'customer_phone' => (string) $order->customer_phone,
                         ],
                     ]);
 
@@ -100,17 +124,29 @@ class RazorpayPaymentService
                     $razorpayOrderId = $responseData['id'];
                     $gatewayResponse = $responseData;
                 } else {
-                    throw new Exception('Razorpay API error: ' . $response->body());
+                    $errData = $response->json();
+                    $errMsg = $errData['error']['description'] ?? ($response->body() ?: 'Authentication failed with Razorpay API.');
+                    throw new Exception("Razorpay API error: {$errMsg}");
                 }
             } catch (\Throwable $e) {
-                // If API fails (e.g. offline sandbox or invalid mock credentials), fallback to test mock order
-                $razorpayOrderId = 'order_' . Str::random(14);
-                $gatewayResponse = ['mock' => true, 'error' => $e->getMessage()];
+                // If in testing environment (phpunit offline), fallback to test mock order
+                if (app()->environment('testing')) {
+                    $razorpayOrderId = 'order_' . Str::random(14);
+                    $gatewayResponse = ['mock' => true, 'error' => $e->getMessage()];
+                    $isMock = true;
+                } else {
+                    Log::error('Razorpay order creation failed: ' . $e->getMessage(), [
+                        'order' => $order->order_number,
+                        'key_id' => substr($keyId, 0, 8) . '...',
+                    ]);
+                    throw new \RuntimeException($e->getMessage());
+                }
             }
         } else {
             // Local dev / test mode mock order ID
             $razorpayOrderId = 'order_' . Str::random(14);
             $gatewayResponse = ['mock' => true];
+            $isMock = true;
         }
 
         // Record pending payment
@@ -135,6 +171,7 @@ class RazorpayPaymentService
             'customer_name' => $order->customer_name,
             'customer_phone' => $order->customer_phone,
             'customer_email' => $order->customer_email,
+            'is_mock' => $isMock,
         ];
     }
 
