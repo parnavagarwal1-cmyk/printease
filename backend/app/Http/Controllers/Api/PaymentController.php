@@ -65,7 +65,8 @@ class PaymentController extends Controller
         $isValid = $this->paymentService->verifyPaymentSignature(
             $validated['razorpay_order_id'],
             $validated['razorpay_payment_id'],
-            $validated['razorpay_signature']
+            $validated['razorpay_signature'],
+            $order
         );
 
         if (!$isValid) {

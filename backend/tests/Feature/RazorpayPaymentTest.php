@@ -188,6 +188,48 @@ class RazorpayPaymentTest extends TestCase
         ]);
     }
 
+    public function test_branch_specific_custom_razorpay_keys_used_for_orders_and_verification(): void
+    {
+        // 1. Configure custom branch keys
+        $this->branch->update([
+            'razorpay_enabled' => true,
+            'razorpay_key_id' => 'rzp_test_branch_custom_123',
+            'razorpay_key_secret' => 'branch_custom_secret_xyz789',
+        ]);
+
+        // 2. Initiate payment - should return the branch's custom key_id
+        $initResp = $this->postJson("/api/public/orders/{$this->order->order_number}/pay");
+        $initResp->assertStatus(200)
+            ->assertJsonPath('razorpay.key_id', 'rzp_test_branch_custom_123');
+
+        $razorpayOrderId = $initResp->json('razorpay.razorpay_order_id');
+        $razorpayPaymentId = 'pay_custom_' . rand(100000, 999999);
+
+        // 3. Compute signature using the branch's custom secret
+        $customSignature = hash_hmac('sha256', $razorpayOrderId . '|' . $razorpayPaymentId, 'branch_custom_secret_xyz789');
+
+        // 4. Verify payment with custom signature
+        $verifyResp = $this->postJson("/api/public/orders/{$this->order->order_number}/verify-payment", [
+            'razorpay_order_id' => $razorpayOrderId,
+            'razorpay_payment_id' => $razorpayPaymentId,
+            'razorpay_signature' => $customSignature,
+        ]);
+
+        $verifyResp->assertStatus(200)
+            ->assertJsonPath('message', 'Payment verified and print job queued successfully.')
+            ->assertJsonPath('order.status', 'PRINT_QUEUED');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $this->order->id,
+            'status' => 'PRINT_QUEUED',
+        ]);
+
+        $this->assertDatabaseHas('print_jobs', [
+            'order_id' => $this->order->id,
+            'status' => 'PRINT_QUEUED',
+        ]);
+    }
+
     public function test_handles_razorpay_webhook_and_enqueues_print_job(): void
     {
         $eventId = 'evt_test_' . rand(100000, 999999);

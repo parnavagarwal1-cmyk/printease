@@ -65,6 +65,9 @@ class BranchController extends Controller
             'merchant_vpa' => ['nullable', 'string', 'max:100'],
             'merchant_name' => ['nullable', 'string', 'max:150'],
             'soundbox_provider' => ['nullable', 'string', 'max:30'],
+            'razorpay_enabled' => ['nullable', 'boolean'],
+            'razorpay_key_id' => ['nullable', 'string', 'max:100'],
+            'razorpay_key_secret' => ['nullable', 'string', 'max:150'],
         ]);
 
         if (!$user->canAccessShop((int) $validated['shop_id'])) {
@@ -174,6 +177,9 @@ class BranchController extends Controller
             'merchant_vpa' => ['nullable', 'string', 'max:100'],
             'merchant_name' => ['nullable', 'string', 'max:150'],
             'soundbox_provider' => ['nullable', 'string', 'max:30'],
+            'razorpay_enabled' => ['nullable', 'boolean'],
+            'razorpay_key_id' => ['nullable', 'string', 'max:100'],
+            'razorpay_key_secret' => ['nullable', 'string', 'max:150'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 

@@ -19,7 +19,8 @@ import {
   QrCode, 
   ShieldCheck, 
   Trash2,
-  TrendingUp
+  TrendingUp,
+  CreditCard
 } from 'lucide-react';
 
 export const ShopOwnerDashboard: React.FC = () => {
@@ -55,6 +56,9 @@ export const ShopOwnerDashboard: React.FC = () => {
   const [merchantVpa, setMerchantVpa] = useState<string>('');
   const [merchantName, setMerchantName] = useState<string>('');
   const [soundboxProvider, setSoundboxProvider] = useState<string>('paytm');
+  const [razorpayEnabled, setRazorpayEnabled] = useState<boolean>(false);
+  const [razorpayKeyId, setRazorpayKeyId] = useState<string>('');
+  const [razorpayKeySecret, setRazorpayKeySecret] = useState<string>('');
   const [savingPayments, setSavingPayments] = useState<boolean>(false);
   const [paymentSaveSuccess, setPaymentSaveSuccess] = useState<boolean>(false);
   const [paymentSaveError, setPaymentSaveError] = useState<string | null>(null);
@@ -99,6 +103,9 @@ export const ShopOwnerDashboard: React.FC = () => {
           setMerchantVpa(firstBranch.merchant_vpa || '');
           setMerchantName(firstBranch.merchant_name || firstBranch.name || '');
           setSoundboxProvider(firstBranch.soundbox_provider || 'paytm');
+          setRazorpayEnabled(Boolean(firstBranch.razorpay_enabled));
+          setRazorpayKeyId(firstBranch.razorpay_key_id || '');
+          setRazorpayKeySecret(firstBranch.razorpay_key_secret || '');
         }
       }
     } catch (err) {
@@ -181,6 +188,9 @@ export const ShopOwnerDashboard: React.FC = () => {
                 setMerchantVpa(brData.branch.merchant_vpa || '');
                 setMerchantName(brData.branch.merchant_name || brData.branch.name || '');
                 setSoundboxProvider(brData.branch.soundbox_provider || 'paytm');
+                setRazorpayEnabled(Boolean(brData.branch.razorpay_enabled));
+                setRazorpayKeyId(brData.branch.razorpay_key_id || '');
+                setRazorpayKeySecret(brData.branch.razorpay_key_secret || '');
               }
             }
           }),
@@ -340,8 +350,13 @@ export const ShopOwnerDashboard: React.FC = () => {
     e.preventDefault();
     if (!token || !activeBranchId) return;
 
-    if (!merchantVpa.trim()) {
-      setPaymentSaveError('Please enter a valid UPI ID (VPA), e.g. 9876543210@paytm or yourname@okhdfcbank');
+    if (!merchantVpa.trim() && !razorpayEnabled) {
+      setPaymentSaveError('Please enter a valid UPI ID (VPA), or enable Razorpay gateway.');
+      return;
+    }
+
+    if (razorpayEnabled && !razorpayKeyId.trim()) {
+      setPaymentSaveError('Please enter your Razorpay Key ID (e.g. rzp_live_... or rzp_test_...).');
       return;
     }
 
@@ -358,9 +373,12 @@ export const ShopOwnerDashboard: React.FC = () => {
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          merchant_vpa: merchantVpa.trim(),
+          merchant_vpa: merchantVpa.trim() || undefined,
           merchant_name: merchantName.trim() || undefined,
           soundbox_provider: soundboxProvider,
+          razorpay_enabled: razorpayEnabled,
+          razorpay_key_id: razorpayKeyId.trim() || null,
+          razorpay_key_secret: razorpayKeySecret.trim() || null,
         }),
       });
 
@@ -377,7 +395,10 @@ export const ShopOwnerDashboard: React.FC = () => {
         ...b,
         merchant_vpa: merchantVpa.trim(),
         merchant_name: merchantName.trim() || b.name,
-        soundbox_provider: soundboxProvider
+        soundbox_provider: soundboxProvider,
+        razorpay_enabled: razorpayEnabled,
+        razorpay_key_id: razorpayKeyId.trim() || null,
+        razorpay_key_secret: razorpayKeySecret.trim() || null,
       } : b));
 
       // Refresh QR poster data
@@ -1414,6 +1435,78 @@ export const ShopOwnerDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Field 4: Razorpay Online Payment Gateway (Instant Auto-Print) */}
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                        <CreditCard className="w-4 h-4 text-indigo-600" />
+                        Razorpay Gateway (Instant Auto-Print)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> Auto-Spooler
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      When enabled, customer payments via Razorpay (UPI, Cards, Netbanking) instantly spool and print without manual counter approval.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={razorpayEnabled}
+                      onChange={(e) => setRazorpayEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {razorpayEnabled && (
+                  <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl space-y-3">
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        Razorpay Key ID <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={razorpayKeyId}
+                        onChange={(e) => setRazorpayKeyId(e.target.value)}
+                        placeholder="rzp_live_xxxxxxxxxxxxxx or rzp_test_xxxxxxxxxxxxxx"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        Found in your Razorpay Dashboard &rarr; Settings &rarr; API Keys.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        Razorpay Key Secret <span className="text-slate-400 font-normal">(stored securely, never exposed to customers)</span>
+                      </label>
+                      <input
+                        type="password"
+                        value={razorpayKeySecret}
+                        onChange={(e) => setRazorpayKeySecret(e.target.value)}
+                        placeholder="Enter key secret"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        Used to verify checkout HMAC-SHA256 signatures before queueing print jobs.
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Zero-touch Counter Flow:</span> Customers can pay directly using Razorpay &rarr; signature is verified &rarr; print job is instantly queued on your active Windows desktop printer!
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Save Button */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                 <div className="text-[11px] text-slate-500">
@@ -1425,7 +1518,7 @@ export const ShopOwnerDashboard: React.FC = () => {
                   className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {savingPayments ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  <span>Save UPI Settings</span>
+                  <span>Save Payment Settings</span>
                 </button>
               </div>
             </form>

@@ -21,12 +21,16 @@ class Branch extends Model
         'merchant_vpa',
         'merchant_name',
         'soundbox_provider',
+        'razorpay_enabled',
+        'razorpay_key_id',
+        'razorpay_key_secret',
         'default_paper_size',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'razorpay_enabled' => 'boolean',
     ];
 
     public function shop()

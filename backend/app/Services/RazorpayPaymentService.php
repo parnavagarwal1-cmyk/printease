@@ -26,10 +26,35 @@ class RazorpayPaymentService
     }
 
     /**
+     * Resolve Razorpay API credentials for a specific order (Shop Branch scoped).
+     */
+    public function getCredentialsForOrder(Order $order): array
+    {
+        $branch = $order->branch ?? ($order->relationLoaded('branch') ? $order->branch : $order->branch()->first());
+        if ($branch && $branch->razorpay_enabled && !empty($branch->razorpay_key_id) && !empty($branch->razorpay_key_secret)) {
+            return [
+                'key_id' => $branch->razorpay_key_id,
+                'key_secret' => $branch->razorpay_key_secret,
+                'is_custom' => true,
+            ];
+        }
+
+        return [
+            'key_id' => $this->keyId,
+            'key_secret' => $this->keySecret,
+            'is_custom' => false,
+        ];
+    }
+
+    /**
      * Create Razorpay Order for a customer print order.
      */
     public function createRazorpayOrder(Order $order): array
     {
+        $creds = $this->getCredentialsForOrder($order);
+        $keyId = $creds['key_id'];
+        $keySecret = $creds['key_secret'];
+
         $amountInPaise = (int) round(((float) $order->total_amount) * 100);
 
         // Check if there is already an existing pending payment with valid razorpay_order_id
@@ -42,7 +67,7 @@ class RazorpayPaymentService
         if ($existingPayment) {
             return [
                 'razorpay_order_id' => $existingPayment->razorpay_order_id,
-                'key_id' => $this->keyId,
+                'key_id' => $keyId,
                 'amount' => $amountInPaise,
                 'currency' => 'INR',
                 'order_number' => $order->order_number,
@@ -56,9 +81,9 @@ class RazorpayPaymentService
         $gatewayResponse = null;
 
         // If configured with live/real Razorpay test credentials
-        if (!str_contains($this->keyId, 'mock') && !empty($this->keySecret)) {
+        if (!str_contains($keyId, 'mock') && !empty($keySecret)) {
             try {
-                $response = Http::withBasicAuth($this->keyId, $this->keySecret)
+                $response = Http::withBasicAuth($keyId, $keySecret)
                     ->post('https://api.razorpay.com/v1/orders', [
                         'amount' => $amountInPaise,
                         'currency' => 'INR',
@@ -103,7 +128,7 @@ class RazorpayPaymentService
 
         return [
             'razorpay_order_id' => $razorpayOrderId,
-            'key_id' => $this->keyId,
+            'key_id' => $keyId,
             'amount' => $amountInPaise,
             'currency' => 'INR',
             'order_number' => $order->order_number,
@@ -116,9 +141,19 @@ class RazorpayPaymentService
     /**
      * Verify payment signature from checkout callback.
      */
-    public function verifyPaymentSignature(string $razorpayOrderId, string $razorpayPaymentId, string $signature): bool
-    {
-        $expected = hash_hmac('sha256', $razorpayOrderId . '|' . $razorpayPaymentId, $this->keySecret);
+    public function verifyPaymentSignature(
+        string $razorpayOrderId,
+        string $razorpayPaymentId,
+        string $signature,
+        ?Order $order = null
+    ): bool {
+        $secret = $this->keySecret;
+        if ($order) {
+            $creds = $this->getCredentialsForOrder($order);
+            $secret = $creds['key_secret'];
+        }
+
+        $expected = hash_hmac('sha256', $razorpayOrderId . '|' . $razorpayPaymentId, $secret);
         return hash_equals($expected, $signature);
     }
 
@@ -236,9 +271,15 @@ class RazorpayPaymentService
     /**
      * Helper to compute signature (useful in test mode & automated tests).
      */
-    public function generateSignature(string $razorpayOrderId, string $razorpayPaymentId): string
+    public function generateSignature(string $razorpayOrderId, string $razorpayPaymentId, ?Order $order = null): string
     {
-        return hash_hmac('sha256', $razorpayOrderId . '|' . $razorpayPaymentId, $this->keySecret);
+        $secret = $this->keySecret;
+        if ($order) {
+            $creds = $this->getCredentialsForOrder($order);
+            $secret = $creds['key_secret'];
+        }
+
+        return hash_hmac('sha256', $razorpayOrderId . '|' . $razorpayPaymentId, $secret);
     }
 
     /**

@@ -49,6 +49,8 @@ class SoundboxPaymentService
             'merchant_vpa' => $vpa,
             'merchant_name' => $payeeName,
             'soundbox_provider' => $branch->soundbox_provider ?? 'paytm',
+            'razorpay_enabled' => (bool) ($branch && $branch->razorpay_enabled && !empty($branch->razorpay_key_id)),
+            'razorpay_key_id' => $branch ? $branch->razorpay_key_id : null,
             'upi_uri' => $upiUri,
             'qr_code_url' => $qrCodeUrl,
             'app_intents' => [

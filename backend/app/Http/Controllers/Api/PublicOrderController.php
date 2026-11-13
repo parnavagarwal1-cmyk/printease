@@ -71,6 +71,8 @@ class PublicOrderController extends Controller
                 'merchant_vpa' => $branch->merchant_vpa,
                 'merchant_name' => $branch->merchant_name,
                 'soundbox_provider' => $branch->soundbox_provider ?? 'paytm',
+                'razorpay_enabled' => (bool) ($branch->razorpay_enabled && !empty($branch->razorpay_key_id)),
+                'razorpay_key_id' => $branch->razorpay_key_id,
                 'default_paper_size' => $branch->default_paper_size ?? 'A4',
             ],
             'shop' => [

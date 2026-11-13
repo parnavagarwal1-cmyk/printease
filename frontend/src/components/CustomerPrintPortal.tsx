@@ -262,7 +262,14 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       // Load dynamic Soundbox UPI payload
       fetch(`/api/public/orders/${encodeURIComponent(resData.order.order_number)}/upi-qr`)
         .then(r => r.json())
-        .then(d => { if (d.upi) setUpiData(d.upi); })
+        .then(d => {
+          if (d.upi) {
+            setUpiData(d.upi);
+            if (d.upi.razorpay_enabled) {
+              setPaymentMethod('razorpay');
+            }
+          }
+        })
         .catch(console.error);
     } catch (err: any) {
       setOrderError(err.message || 'Failed to place order.');
@@ -568,7 +575,10 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                   }`}
                 >
                   <CreditCard className="w-3.5 h-3.5" />
-                  <span>Cards / Online</span>
+                  <span>Online / Razorpay</span>
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full ml-1">
+                    ⚡ Auto-Print
+                  </span>
                 </button>
               </div>
 
