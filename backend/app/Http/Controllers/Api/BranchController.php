@@ -31,15 +31,15 @@ class BranchController extends Controller
             if (!$user->canAccessShop((int) $shopId)) {
                 return response()->json(['message' => 'Forbidden: You do not have access to this shop.'], 403);
             }
-            $branches = Branch::where('shop_id', $shopId)->with(['printers', 'activeQrCode', 'desktopDevices'])->get();
+            $branches = Branch::where('shop_id', $shopId)->with(['shop.activeSubscription.plan', 'printers', 'activeQrCode', 'desktopDevices'])->get();
         } else {
             if ($user->isSuperAdmin()) {
-                $branches = Branch::with(['shop:id,name', 'printers'])->get();
+                $branches = Branch::with(['shop.activeSubscription.plan', 'printers'])->get();
             } else {
                 $shopIds = $user->ownedShops()->pluck('id')
                     ->merge($user->memberships()->pluck('shop_id'))
                     ->unique();
-                $branches = Branch::whereIn('shop_id', $shopIds)->with(['printers', 'activeQrCode', 'desktopDevices'])->get();
+                $branches = Branch::whereIn('shop_id', $shopIds)->with(['shop.activeSubscription.plan', 'printers', 'activeQrCode', 'desktopDevices'])->get();
             }
         }
 
@@ -137,7 +137,7 @@ class BranchController extends Controller
             return response()->json(['message' => 'Forbidden: You do not have access to this branch.'], 403);
         }
 
-        $branch = Branch::with(['printers', 'desktopDevices', 'qrCodes', 'pricingRules'])->findOrFail($id);
+        $branch = Branch::with(['printers', 'desktopDevices', 'qrCodes', 'pricingRules', 'shop.activeSubscription.plan', 'shop.branches'])->findOrFail($id);
 
         $threshold = now()->subMinutes(2);
         $branch->desktopDevices->transform(function ($dev) use ($threshold) {

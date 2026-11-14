@@ -21,11 +21,11 @@ class ShopController extends Controller
         $user = $request->user();
 
         if ($user->isSuperAdmin()) {
-            $shops = Shop::with(['owner:id,name,email', 'branches'])->get();
+            $shops = Shop::with(['owner:id,name,email', 'branches', 'activeSubscription.plan'])->get();
         } else {
             $shops = Shop::where('owner_id', $user->id)
                 ->orWhereHas('members', fn($q) => $q->where('user_id', $user->id))
-                ->with('branches')
+                ->with(['branches', 'activeSubscription.plan'])
                 ->get();
         }
 
@@ -142,7 +142,7 @@ class ShopController extends Controller
         $shop = Shop::findOrFail($id);
 
         $validated = $request->validate([
-            'plan_slug' => ['required', 'string', 'in:starter,pro,fleet'],
+            'plan_slug' => ['required', 'string', 'exists:plans,slug'],
         ]);
 
         $plan = Plan::where('slug', $validated['plan_slug'])->firstOrFail();

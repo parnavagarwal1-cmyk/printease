@@ -68,19 +68,25 @@ class RazorpayPaymentService
 
         $amountInPaise = (int) round(((float) $order->total_amount) * 100);
 
-        // Check if there is already an existing pending payment with valid razorpay_order_id
+        // Check if there is already an existing pending payment with valid razorpay_order_id for this exact key
         $existingPayment = Payment::where('order_id', $order->id)
             ->where('status', 'pending')
             ->whereNotNull('razorpay_order_id')
             ->latest()
             ->first();
 
+        $savedKeyId = $existingPayment && is_array($existingPayment->gateway_response)
+            ? ($existingPayment->gateway_response['key_id'] ?? null)
+            : null;
+
         $isMockResponse = $existingPayment && (
             ($existingPayment->gateway_response['mock'] ?? false) ||
             !empty($existingPayment->gateway_response['error'])
         );
 
-        if ($existingPayment && !$isMockResponse) {
+        $isKeyMismatch = $existingPayment && $savedKeyId !== null && $savedKeyId !== $keyId;
+
+        if ($existingPayment && !$isMockResponse && !$isKeyMismatch) {
             return [
                 'razorpay_order_id' => $existingPayment->razorpay_order_id,
                 'key_id' => $keyId,
@@ -94,8 +100,8 @@ class RazorpayPaymentService
             ];
         }
 
-        // Clean up previous failed/mock attempt so fresh real order can be created
-        if ($existingPayment && $isMockResponse) {
+        // Clean up previous failed/mock/mismatched attempt so fresh real order can be created
+        if ($existingPayment) {
             $existingPayment->delete();
         }
 
@@ -147,6 +153,12 @@ class RazorpayPaymentService
             $razorpayOrderId = 'order_' . Str::random(14);
             $gatewayResponse = ['mock' => true];
             $isMock = true;
+        }
+
+        if (is_array($gatewayResponse)) {
+            $gatewayResponse['key_id'] = $keyId;
+        } else {
+            $gatewayResponse = ['key_id' => $keyId];
         }
 
         // Record pending payment

@@ -214,6 +214,11 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     setOrderError(null);
 
     try {
+      const digitsOnly = customerPhone.replace(/[^0-9]/g, '');
+      if (customerPhone.trim() && digitsOnly.length !== 10) {
+        throw new Error('Please enter a valid 10-digit mobile number (e.g. 9876543210).');
+      }
+
       const range = pageRangeMode === 'custom' ? customPageRange : 'all';
       const payload = {
         customer_name: customerName.trim() || 'Counter Customer',
@@ -302,9 +307,21 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       const isMock = Boolean(initData.razorpay?.is_mock) || !keyId || keyId.includes('mock');
 
       if (!isMock && rzpOrderId && typeof (window as any).Razorpay !== 'undefined') {
+        // Sanitize prefill parameters so bad phone/email formats don't crash Razorpay checkout
+        const cleanPhone = (createdOrder.customer_phone || '').replace(/[^0-9]/g, '');
+        const validContact = cleanPhone.length === 10 ? cleanPhone : (cleanPhone.length > 10 ? cleanPhone.slice(-10) : undefined);
+        const cleanEmail = (createdOrder.customer_email || '').trim();
+        const validEmail = cleanEmail.includes('@') && cleanEmail.includes('.') ? cleanEmail : undefined;
+
+        const prefillData: Record<string, string> = {
+          name: createdOrder.customer_name || 'Customer',
+        };
+        if (validContact) prefillData.contact = validContact;
+        if (validEmail) prefillData.email = validEmail;
+
         const options = {
           key: keyId,
-          amount: initData.razorpay.amount,
+          amount: Math.round(Number(initData.razorpay.amount)),
           currency: initData.razorpay.currency || 'INR',
           name: branchData?.shop?.name || 'PrintEase',
           description: `Print Order #${createdOrder.order_number}`,
@@ -335,11 +352,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
               setPaying(false);
             }
           },
-          prefill: {
-            name: createdOrder.customer_name,
-            contact: createdOrder.customer_phone,
-            email: createdOrder.customer_email || '',
-          },
+          prefill: prefillData,
           theme: {
             color: '#4F46E5',
           },
@@ -350,14 +363,19 @@ export const CustomerPrintPortal: React.FC<Props> = ({
           }
         };
 
-        const rzp = new (window as any).Razorpay(options);
-        rzp.on('payment.failed', function (resp: any) {
-          setPaying(false);
-          const failMsg = resp.error?.description || resp.error?.reason || 'Payment failed.';
-          setPaymentError(`Payment failed: ${failMsg}`);
-        });
-        rzp.open();
-        return;
+        try {
+          const rzp = new (window as any).Razorpay(options);
+          rzp.on('payment.failed', function (resp: any) {
+            setPaying(false);
+            const failMsg = resp.error?.description || resp.error?.reason || 'Payment failed.';
+            setPaymentError(`Payment failed: ${failMsg}`);
+          });
+          rzp.open();
+          return;
+        } catch (sdkErr: any) {
+          console.error('Razorpay SDK modal error:', sdkErr);
+          throw new Error(`Could not open payment window: ${sdkErr.message || 'Initialization error'}`);
+        }
       }
 
       if (isMock) {

@@ -134,6 +134,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/branches/{id}/printers', [BranchController::class, 'addPrinter']);
     Route::get('/branches/{id}/qr-poster', [BranchController::class, 'qrPoster']);
 
+    // Subscription Plans (Tenant Scoped & Browseable)
+    Route::get('/plans', [AdminController::class, 'plans']);
+
     // Super Admin Control Plane
     Route::prefix('admin')->group(function () {
         Route::get('/metrics', [AdminController::class, 'metrics']);
@@ -142,6 +145,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/shops/{id}', [AdminController::class, 'deleteShop']);
         Route::get('/audit-logs', [AdminController::class, 'auditLogs']);
         Route::get('/plans', [AdminController::class, 'plans']);
+        Route::post('/plans', [AdminController::class, 'storePlan']);
+        Route::put('/plans/{id}', [AdminController::class, 'updatePlan']);
+        Route::delete('/plans/{id}', [AdminController::class, 'deletePlan']);
         Route::put('/profile', [AdminController::class, 'updateProfile']);
     });
 });

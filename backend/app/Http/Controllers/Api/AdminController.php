@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
@@ -193,8 +194,119 @@ class AdminController extends Controller
      */
     public function plans(Request $request): JsonResponse
     {
-        $plans = Plan::where('is_active', true)->orderBy('monthly_price', 'asc')->get();
+        $user = $request->user();
+        $query = Plan::query();
+        if (!$user || !$user->isSuperAdmin()) {
+            $query->where('is_active', true);
+        }
+        $plans = $query->orderBy('monthly_price', 'asc')->get();
         return response()->json(['plans' => $plans]);
+    }
+
+    /**
+     * Create a new subscription plan (Super Admin only)
+     */
+    public function storePlan(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->isSuperAdmin()) {
+            return response()->json(['message' => 'Forbidden: Super admin access required.'], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:100', 'unique:plans,slug'],
+            'monthly_price' => ['required', 'numeric', 'min:0'],
+            'max_branches' => ['required', 'integer', 'min:1'],
+            'max_printers_per_branch' => ['required', 'integer', 'min:1'],
+            'monthly_print_limit' => ['nullable', 'integer', 'min:0'],
+            'features' => ['nullable', 'array'],
+            'features.*' => ['string'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $slug = !empty($validated['slug']) ? Str::slug($validated['slug']) : Str::slug($validated['name']);
+
+        $plan = Plan::create([
+            'name' => $validated['name'],
+            'slug' => $slug,
+            'monthly_price' => $validated['monthly_price'],
+            'max_branches' => $validated['max_branches'],
+            'max_printers_per_branch' => $validated['max_printers_per_branch'],
+            'monthly_print_limit' => $validated['monthly_print_limit'] ?? 5000,
+            'features' => $validated['features'] ?? ['QR Self-Service', 'Automated Cloud Spooler'],
+            'is_active' => $validated['is_active'] ?? true,
+        ]);
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'action' => 'plan_created',
+            'entity_type' => 'plan',
+            'entity_id' => $plan->id,
+            'ip_address' => $request->ip(),
+            'details' => ['name' => $plan->name, 'monthly_price' => $plan->monthly_price],
+        ]);
+
+        return response()->json(['message' => "Plan '{$plan->name}' created successfully.", 'plan' => $plan], 201);
+    }
+
+    /**
+     * Update an existing subscription plan (Super Admin only)
+     */
+    public function updatePlan(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->isSuperAdmin()) {
+            return response()->json(['message' => 'Forbidden: Super admin access required.'], 403);
+        }
+
+        $plan = Plan::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'monthly_price' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'max_branches' => ['sometimes', 'required', 'integer', 'min:1'],
+            'max_printers_per_branch' => ['sometimes', 'required', 'integer', 'min:1'],
+            'monthly_print_limit' => ['nullable', 'integer', 'min:0'],
+            'features' => ['nullable', 'array'],
+            'features.*' => ['string'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $plan->update($validated);
+
+        AuditLog::create([
+            'user_id' => $user->id,
+            'action' => 'plan_updated',
+            'entity_type' => 'plan',
+            'entity_id' => $plan->id,
+            'ip_address' => $request->ip(),
+            'details' => $validated,
+        ]);
+
+        return response()->json(['message' => "Plan '{$plan->name}' updated successfully.", 'plan' => $plan]);
+    }
+
+    /**
+     * Delete an existing subscription plan (Super Admin only)
+     */
+    public function deletePlan(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user->isSuperAdmin()) {
+            return response()->json(['message' => 'Forbidden: Super admin access required.'], 403);
+        }
+
+        $plan = Plan::findOrFail($id);
+
+        if ($plan->subscriptions()->where('status', 'active')->exists()) {
+            $plan->update(['is_active' => false]);
+            return response()->json(['message' => "Plan has active subscribers, marked as inactive."]);
+        }
+
+        $plan->delete();
+
+        return response()->json(['message' => "Plan deleted successfully."]);
     }
 
     /**

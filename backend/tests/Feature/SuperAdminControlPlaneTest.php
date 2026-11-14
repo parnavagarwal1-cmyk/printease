@@ -232,4 +232,43 @@ class SuperAdminControlPlaneTest extends TestCase
             'name' => 'Chief Admin',
         ]);
     }
+
+    public function test_super_admin_can_create_custom_subscription_plan(): void
+    {
+        Sanctum::actingAs($this->superAdmin);
+
+        $response = $this->postJson('/api/admin/plans', [
+            'name' => 'Campus Special Plan',
+            'monthly_price' => 799.00,
+            'max_branches' => 2,
+            'max_printers_per_branch' => 4,
+            'monthly_print_limit' => 5000,
+            'features' => ['Fast Spooling', 'Color Calibration', '2 Hardware Agents'],
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('plan.name', 'Campus Special Plan')
+            ->assertJsonPath('plan.slug', 'campus-special-plan')
+            ->assertJsonPath('plan.max_branches', 2);
+
+        $this->assertDatabaseHas('plans', [
+            'slug' => 'campus-special-plan',
+            'monthly_price' => 799.00,
+        ]);
+
+        // Verify shop owner can view and subscribe to this new plan
+        Sanctum::actingAs($this->shopOwner);
+
+        $subResp = $this->postJson("/api/shops/{$this->shop->id}/subscribe", [
+            'plan_slug' => 'campus-special-plan',
+        ]);
+
+        $subResp->assertStatus(200)
+            ->assertJsonPath('subscription.plan.slug', 'campus-special-plan');
+
+        $this->assertDatabaseHas('subscriptions', [
+            'shop_id' => $this->shop->id,
+            'status' => 'active',
+        ]);
+    }
 }

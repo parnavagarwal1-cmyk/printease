@@ -18,7 +18,9 @@ import {
   ShieldCheck, 
   Trash2,
   TrendingUp,
-  CreditCard
+  CreditCard,
+  Crown,
+  Zap
 } from 'lucide-react';
 
 export const ShopOwnerDashboard: React.FC = () => {
@@ -44,11 +46,18 @@ export const ShopOwnerDashboard: React.FC = () => {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   // UI state
-  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'pricing' | 'payments' | 'poster' | 'hardware'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'orders' | 'pricing' | 'payments' | 'poster' | 'hardware' | 'subscription'>('analytics');
   const [loading, setLoading] = useState<boolean>(false);
   const [savingPrices, setSavingPrices] = useState<boolean>(false);
   const [priceSaveSuccess, setPriceSaveSuccess] = useState<boolean>(false);
   const [defaultPaperSize, setDefaultPaperSize] = useState<string>('A4');
+
+  // Subscription & Plans state
+  const [currentShop, setCurrentShop] = useState<any | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [subscribingSlug, setSubscribingSlug] = useState<string | null>(null);
+  const [subscriptionMessage, setSubscriptionMessage] = useState<string | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
   // Razorpay Gateway configuration state
   const [razorpayEnabled, setRazorpayEnabled] = useState<boolean>(false);
@@ -83,6 +92,20 @@ export const ShopOwnerDashboard: React.FC = () => {
     }
   }, []);
 
+  const fetchPlans = useCallback(async (authToken: string) => {
+    try {
+      const res = await fetch('/api/plans', {
+        headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailablePlans(data.plans || []);
+      }
+    } catch (err) {
+      console.error('Fetch plans error:', err);
+    }
+  }, []);
+
   const fetchBranches = useCallback(async (authToken: string) => {
     try {
       const res = await fetch('/api/branches', {
@@ -98,6 +121,9 @@ export const ShopOwnerDashboard: React.FC = () => {
           setRazorpayEnabled(Boolean(firstBranch.razorpay_enabled));
           setRazorpayKeyId(firstBranch.razorpay_key_id || '');
           setRazorpayKeySecret(firstBranch.razorpay_key_secret || '');
+          if (firstBranch.shop) {
+            setCurrentShop(firstBranch.shop);
+          }
         }
       }
     } catch (err) {
@@ -109,8 +135,9 @@ export const ShopOwnerDashboard: React.FC = () => {
     if (token) {
       fetchCurrentUser(token);
       fetchBranches(token);
+      fetchPlans(token);
     }
-  }, [token, fetchCurrentUser, fetchBranches]);
+  }, [token, fetchCurrentUser, fetchBranches, fetchPlans]);
 
   // 2. Fetch Branch-Specific Data
   const fetchBranchData = useCallback(async (silent = false) => {
@@ -180,6 +207,9 @@ export const ShopOwnerDashboard: React.FC = () => {
                 setRazorpayEnabled(Boolean(brData.branch.razorpay_enabled));
                 setRazorpayKeyId(brData.branch.razorpay_key_id || '');
                 setRazorpayKeySecret(brData.branch.razorpay_key_secret || '');
+                if (brData.branch.shop) {
+                  setCurrentShop(brData.branch.shop);
+                }
               }
             }
           }),
@@ -413,6 +443,43 @@ export const ShopOwnerDashboard: React.FC = () => {
     navigator.clipboard.writeText(url);
     setCopiedWebhookUrl(url);
     setTimeout(() => setCopiedWebhookUrl(null), 2500);
+  };
+
+  // 4c. Upgrade or Change SaaS Subscription Plan
+  const handleSubscribe = async (planSlug: string) => {
+    const shopId = currentShop?.id || (branches.length > 0 ? branches[0].shop_id : null);
+    if (!token || !shopId) return;
+
+    setSubscribingSlug(planSlug);
+    setSubscriptionMessage(null);
+    setSubscriptionError(null);
+
+    try {
+      const res = await fetch(`/api/shops/${shopId}/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ plan_slug: planSlug }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Subscription upgrade failed.');
+      }
+
+      setSubscriptionMessage(data.message || 'Subscription updated successfully!');
+      if (token) {
+        fetchBranches(token);
+        fetchBranchData();
+      }
+    } catch (err: any) {
+      setSubscriptionError(err.message || 'Failed to update subscription.');
+    } finally {
+      setSubscribingSlug(null);
+    }
   };
 
   // 5. Generate New Pairing Code
@@ -773,6 +840,17 @@ export const ShopOwnerDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5">
+            {currentShop?.active_subscription?.plan && (
+              <button
+                onClick={() => setActiveTab('subscription')}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 transition-all cursor-pointer shadow-sm"
+                title="View SaaS Plan & Quotas"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-300" />
+                <span>{currentShop.active_subscription.plan.name} Plan</span>
+              </button>
+            )}
+
             <button
               onClick={() => fetchBranchData(false)}
               disabled={loading}
@@ -916,6 +994,25 @@ export const ShopOwnerDashboard: React.FC = () => {
         >
           <Monitor className="w-3.5 h-3.5" />
           Hardware & Agents
+        </button>
+
+        <button
+          onClick={() => setActiveTab('subscription')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+            activeTab === 'subscription'
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+              : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/60'
+          }`}
+        >
+          <Crown className="w-3.5 h-3.5" />
+          <span>Plans & Billing</span>
+          {currentShop?.active_subscription?.plan && (
+            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] uppercase font-mono ${
+              activeTab === 'subscription' ? 'bg-indigo-700 text-indigo-100' : 'bg-indigo-100 text-indigo-700'
+            }`}>
+              {currentShop.active_subscription.plan.name}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1725,6 +1822,229 @@ export const ShopOwnerDashboard: React.FC = () => {
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: SaaS Subscription Plans & Quotas */}
+      {activeTab === 'subscription' && (
+        <div className="space-y-6">
+          {/* Active Subscription Summary Banner */}
+          <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 transform skew-x-12" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-200 text-xs font-bold border border-indigo-400/30">
+                  <Crown className="w-3.5 h-3.5 text-amber-300" />
+                  <span>SaaS Subscription Status</span>
+                </div>
+                <h3 className="text-xl font-black tracking-tight">
+                  {currentShop?.active_subscription?.plan?.name || 'Starter Plan'}
+                </h3>
+                <p className="text-xs text-indigo-200 max-w-xl">
+                  Your shop is currently on the{' '}
+                  <strong className="text-white">
+                    {currentShop?.active_subscription?.plan?.name || 'Starter'}
+                  </strong>{' '}
+                  tier (₹{currentShop?.active_subscription?.plan?.monthly_price || 0}/month).
+                  Manage multi-branch limits, printer slots, and monthly customer print volumes.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10">
+                <div className="text-right">
+                  <div className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Plan Status</div>
+                  <div className="text-sm font-extrabold text-emerald-300 uppercase tracking-wide">
+                    {currentShop?.active_subscription?.status || 'Active'}
+                  </div>
+                </div>
+                <div className="w-px h-8 bg-white/20" />
+                <div className="text-right">
+                  <div className="text-xs text-indigo-200 uppercase font-bold tracking-wider">Monthly Fee</div>
+                  <div className="text-base font-black text-white font-mono">
+                    ₹{parseFloat(String(currentShop?.active_subscription?.plan?.monthly_price || 0)).toFixed(0)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quota Usage Meters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10 relative z-10">
+              <div className="bg-white/5 p-3.5 rounded-xl border border-white/10">
+                <div className="flex justify-between items-center text-xs mb-1.5">
+                  <span className="text-indigo-200 font-medium">Branch Quota:</span>
+                  <span className="font-bold text-white font-mono">
+                    {branches.length} / {currentShop?.active_subscription?.plan?.max_branches >= 999 ? 'Unlimited' : (currentShop?.active_subscription?.plan?.max_branches || 1)}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-400 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, (branches.length / (currentShop?.active_subscription?.plan?.max_branches || 1)) * 100)}%`
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white/5 p-3.5 rounded-xl border border-white/10">
+                <div className="flex justify-between items-center text-xs mb-1.5">
+                  <span className="text-indigo-200 font-medium">Printers (Active Branch):</span>
+                  <span className="font-bold text-white font-mono">
+                    {printers.length} / {currentShop?.active_subscription?.plan?.max_printers_per_branch >= 999 ? 'Unlimited' : (currentShop?.active_subscription?.plan?.max_printers_per_branch || 2)}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-400 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, (printers.length / (currentShop?.active_subscription?.plan?.max_printers_per_branch || 2)) * 100)}%`
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white/5 p-3.5 rounded-xl border border-white/10">
+                <div className="flex justify-between items-center text-xs mb-1.5">
+                  <span className="text-indigo-200 font-medium">Monthly Prints:</span>
+                  <span className="font-bold text-white font-mono">
+                    {analytics?.completed_prints_today || 0} / {currentShop?.active_subscription?.plan?.monthly_print_limit ? currentShop.active_subscription.plan.monthly_print_limit.toLocaleString() : 'Unlimited'}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-400 rounded-full w-2" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feedback Alerts */}
+          {subscriptionMessage && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{subscriptionMessage}</span>
+            </div>
+          )}
+
+          {subscriptionError && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{subscriptionError}</span>
+            </div>
+          )}
+
+          {/* Available SaaS Plans Grid */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">Choose Your Subscription Tier</h3>
+              <p className="text-xs text-slate-500">
+                Upgrade instantly to unlock additional branch counters, more connected hardware printers, and higher print limits.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {availablePlans.map((p) => {
+                const isCurrent = currentShop?.active_subscription?.plan?.id === p.id ||
+                  currentShop?.active_subscription?.plan?.slug === p.slug;
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`relative bg-white rounded-2xl p-6 border transition-all flex flex-col justify-between ${
+                      isCurrent
+                        ? 'border-indigo-600 ring-2 ring-indigo-600/20 shadow-md'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                  >
+                    {p.is_popular && !isCurrent && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-wider px-3 py-1 bg-amber-500 text-white rounded-full shadow-sm">
+                        ⭐ Most Popular
+                      </span>
+                    )}
+
+                    {isCurrent && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-wider px-3 py-1 bg-emerald-600 text-white rounded-full shadow-sm">
+                        ✓ Current Plan
+                      </span>
+                    )}
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-extrabold text-base text-slate-900">{p.name}</h4>
+                          <span className="text-[11px] text-slate-400 font-medium">SaaS Monthly Tier</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-2xl font-black text-slate-900 font-mono">
+                            ₹{parseFloat(String(p.monthly_price)).toFixed(0)}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-medium block">/month</span>
+                        </div>
+                      </div>
+
+                      {/* Quotas overview */}
+                      <div className="space-y-2 py-3 border-t border-b border-slate-100 text-xs">
+                        <div className="flex justify-between text-slate-600">
+                          <span>Branches:</span>
+                          <span className="font-bold text-slate-900">{p.max_branches >= 999 ? 'Unlimited' : p.max_branches}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                          <span>Printers per Branch:</span>
+                          <span className="font-bold text-slate-900">{p.max_printers_per_branch >= 999 ? 'Unlimited' : p.max_printers_per_branch}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                          <span>Monthly Print Limit:</span>
+                          <span className="font-bold text-slate-900">{p.monthly_print_limit ? p.monthly_print_limit.toLocaleString() : 'Unlimited'}</span>
+                        </div>
+                      </div>
+
+                      {/* Features list */}
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Features Included:</span>
+                        <div className="space-y-1.5 text-xs text-slate-700">
+                          {(Array.isArray(p.features) ? p.features : []).map((feat: string, fIdx: number) => (
+                            <div key={fIdx} className="flex items-center gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>{feat}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6">
+                      {isCurrent ? (
+                        <button
+                          disabled
+                          className="w-full py-3 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl cursor-default flex items-center justify-center gap-1.5"
+                        >
+                          <Check className="w-4 h-4 text-emerald-600" />
+                          <span>Current Active Plan</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleSubscribe(p.slug)}
+                          disabled={subscribingSlug === p.slug}
+                          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {subscribingSlug === p.slug ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Upgrading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-3.5 h-3.5" />
+                              <span>Upgrade to {p.name}</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

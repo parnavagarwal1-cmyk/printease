@@ -10,7 +10,9 @@ import {
   Layers,
   Trash2,
   Lock,
-  KeyRound
+  KeyRound,
+  Plus,
+  X
 } from 'lucide-react';
 import { GoogleSignInButton } from './GoogleSignInButton';
 
@@ -37,6 +39,17 @@ export const SuperAdminControlPlane: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Create Plan Modal state
+  const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
+  const [newPlanName, setNewPlanName] = useState('');
+  const [newPlanPrice, setNewPlanPrice] = useState('499');
+  const [newPlanMaxBranches, setNewPlanMaxBranches] = useState('1');
+  const [newPlanMaxPrinters, setNewPlanMaxPrinters] = useState('2');
+  const [newPlanPrintLimit, setNewPlanPrintLimit] = useState('5000');
+  const [newPlanFeatures, setNewPlanFeatures] = useState('QR Self-Service, Basic Pricing, 1 Device Agent');
+  const [creatingPlan, setCreatingPlan] = useState(false);
+  const [createPlanError, setCreatePlanError] = useState<string | null>(null);
 
   // Verify and fetch user
   const fetchAdminUser = useCallback(async (authToken: string) => {
@@ -219,6 +232,79 @@ export const SuperAdminControlPlane: React.FC = () => {
       setProfileError(err.message || 'Error updating credentials');
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const handleCreatePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+
+    if (!newPlanName.trim()) {
+      setCreatePlanError('Please enter a plan name.');
+      return;
+    }
+
+    setCreatingPlan(true);
+    setCreatePlanError(null);
+
+    try {
+      const featuresArr = newPlanFeatures
+        .split(',')
+        .map(f => f.trim())
+        .filter(Boolean);
+
+      const res = await fetch('/api/admin/plans', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newPlanName.trim(),
+          monthly_price: parseFloat(newPlanPrice) || 0,
+          max_branches: parseInt(newPlanMaxBranches, 10) || 1,
+          max_printers_per_branch: parseInt(newPlanMaxPrinters, 10) || 1,
+          monthly_print_limit: parseInt(newPlanPrintLimit, 10) || 0,
+          features: featuresArr.length > 0 ? featuresArr : ['QR Self-Service'],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to create plan.');
+      }
+
+      setPlans(prev => [...prev, data.plan]);
+      setShowCreatePlanModal(false);
+      setNewPlanName('');
+      setNewPlanPrice('499');
+      setNewPlanMaxBranches('1');
+      setNewPlanMaxPrinters('2');
+      setNewPlanPrintLimit('5000');
+      setNewPlanFeatures('QR Self-Service, Basic Pricing, 1 Device Agent');
+    } catch (err: any) {
+      setCreatePlanError(err.message || 'Error creating plan');
+    } finally {
+      setCreatingPlan(false);
+    }
+  };
+
+  const handleDeletePlan = async (planId: number) => {
+    if (!token || !window.confirm('Are you sure you want to delete or deactivate this plan?')) return;
+    try {
+      const res = await fetch(`/api/admin/plans/${planId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
+      });
+      if (res.ok) {
+        setPlans(prev => prev.filter(p => p.id !== planId));
+      } else {
+        const d = await res.json();
+        alert(d.message || 'Failed to delete plan.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Network error');
     }
   };
 
@@ -540,36 +626,77 @@ export const SuperAdminControlPlane: React.FC = () => {
 
       {/* Tab 4: Plans & Limits */}
       {activeTab === 'plans' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map(p => (
-            <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold text-lg text-slate-900">{p.name}</h3>
-                <span className="text-xs font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-mono">
-                  ₹{p.monthly_price}/mo
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs text-slate-600 border-t border-b border-slate-100 py-4">
-                <div className="flex justify-between">
-                  <span>Max Branches:</span>
-                  <span className="font-bold text-slate-900">{p.max_branches >= 999 ? 'Unlimited' : p.max_branches}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Printers per Branch:</span>
-                  <span className="font-bold text-slate-900">{p.max_printers_per_branch >= 999 ? 'Unlimited' : p.max_printers_per_branch}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Monthly Prints:</span>
-                  <span className="font-bold text-slate-900">{p.monthly_print_limit ? p.monthly_print_limit : 'Unlimited'}</span>
-                </div>
-              </div>
-
-              <span className="block text-[11px] text-center text-emerald-600 font-semibold">
-                ✓ Tier Active in Database
-              </span>
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div>
+              <h3 className="font-bold text-base text-slate-900">Subscription Plans & Multi-Tenant Quotas</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Define multi-tier packages, branch caps, and printer quotas for shop owners.</p>
             </div>
-          ))}
+            <button
+              onClick={() => setShowCreatePlanModal(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-all cursor-pointer self-start sm:self-center"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Plan</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {plans.map(p => (
+              <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4 relative flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-lg text-slate-900">{p.name}</h3>
+                    <span className="text-xs font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-mono">
+                      ₹{p.monthly_price}/mo
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-slate-600 border-t border-b border-slate-100 py-4">
+                    <div className="flex justify-between">
+                      <span>Max Branches:</span>
+                      <span className="font-bold text-slate-900">{p.max_branches >= 999 ? 'Unlimited' : p.max_branches}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Printers per Branch:</span>
+                      <span className="font-bold text-slate-900">{p.max_printers_per_branch >= 999 ? 'Unlimited' : p.max_printers_per_branch}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Monthly Prints:</span>
+                      <span className="font-bold text-slate-900">{p.monthly_print_limit ? p.monthly_print_limit.toLocaleString() : 'Unlimited'}</span>
+                    </div>
+                  </div>
+
+                  {Array.isArray(p.features) && p.features.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Features:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {p.features.map((feat: string, idx: number) => (
+                          <span key={idx} className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">
+                            ✓ {feat}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Active in Database</span>
+                  </span>
+                  <button
+                    onClick={() => handleDeletePlan(p.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="Delete or Deactivate Plan"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -669,6 +796,142 @@ export const SuperAdminControlPlane: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Create Plan Modal */}
+      {showCreatePlanModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-extrabold text-base tracking-tight">Create Subscription Plan</h3>
+                <p className="text-xs text-slate-300 mt-0.5">Configure pricing, limits, and feature permissions for shops</p>
+              </div>
+              <button
+                onClick={() => setShowCreatePlanModal(false)}
+                className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePlan} className="p-6 space-y-4">
+              {createPlanError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{createPlanError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Plan Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newPlanName}
+                    onChange={e => setNewPlanName(e.target.value)}
+                    placeholder="e.g. Startup Special"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Monthly Price (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={newPlanPrice}
+                    onChange={e => setNewPlanPrice(e.target.value)}
+                    placeholder="499"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Max Branches
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newPlanMaxBranches}
+                    onChange={e => setNewPlanMaxBranches(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Printers / Branch
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newPlanMaxPrinters}
+                    onChange={e => setNewPlanMaxPrinters(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Monthly Prints
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newPlanPrintLimit}
+                    onChange={e => setNewPlanPrintLimit(e.target.value)}
+                    placeholder="5000"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Features (comma-separated)
+                </label>
+                <textarea
+                  rows={2}
+                  value={newPlanFeatures}
+                  onChange={e => setNewPlanFeatures(e.target.value)}
+                  placeholder="QR Self-Service, Basic Pricing, 1 Device Agent, Priority Spooler"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePlanModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingPlan}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {creatingPlan && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Create Plan</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
