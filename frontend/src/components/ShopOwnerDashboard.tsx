@@ -14,8 +14,6 @@ import {
   LogOut, 
   Store, 
   Sparkles, 
-  Wallet, 
-  Volume2, 
   QrCode, 
   ShieldCheck, 
   Trash2,
@@ -52,10 +50,7 @@ export const ShopOwnerDashboard: React.FC = () => {
   const [priceSaveSuccess, setPriceSaveSuccess] = useState<boolean>(false);
   const [defaultPaperSize, setDefaultPaperSize] = useState<string>('A4');
 
-  // Payments & UPI configuration state
-  const [merchantVpa, setMerchantVpa] = useState<string>('');
-  const [merchantName, setMerchantName] = useState<string>('');
-  const [soundboxProvider, setSoundboxProvider] = useState<string>('paytm');
+  // Razorpay Gateway configuration state
   const [razorpayEnabled, setRazorpayEnabled] = useState<boolean>(false);
   const [razorpayKeyId, setRazorpayKeyId] = useState<string>('');
   const [razorpayKeySecret, setRazorpayKeySecret] = useState<string>('');
@@ -100,9 +95,6 @@ export const ShopOwnerDashboard: React.FC = () => {
           const firstBranch = data.branches[0];
           setActiveBranchId(firstBranch.id);
           setDefaultPaperSize(firstBranch.default_paper_size || 'A4');
-          setMerchantVpa(firstBranch.merchant_vpa || '');
-          setMerchantName(firstBranch.merchant_name || firstBranch.name || '');
-          setSoundboxProvider(firstBranch.soundbox_provider || 'paytm');
           setRazorpayEnabled(Boolean(firstBranch.razorpay_enabled));
           setRazorpayKeyId(firstBranch.razorpay_key_id || '');
           setRazorpayKeySecret(firstBranch.razorpay_key_secret || '');
@@ -185,9 +177,6 @@ export const ShopOwnerDashboard: React.FC = () => {
               setDevices(brData.branch?.desktop_devices || []);
               if (brData.branch) {
                 setDefaultPaperSize(brData.branch.default_paper_size || 'A4');
-                setMerchantVpa(brData.branch.merchant_vpa || '');
-                setMerchantName(brData.branch.merchant_name || brData.branch.name || '');
-                setSoundboxProvider(brData.branch.soundbox_provider || 'paytm');
                 setRazorpayEnabled(Boolean(brData.branch.razorpay_enabled));
                 setRazorpayKeyId(brData.branch.razorpay_key_id || '');
                 setRazorpayKeySecret(brData.branch.razorpay_key_secret || '');
@@ -345,15 +334,10 @@ export const ShopOwnerDashboard: React.FC = () => {
     }
   };
 
-  // 4b. Save UPI & Soundbox Payment Settings
+  // 4b. Save Razorpay Payment Gateway Settings
   const handleSavePayments = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !activeBranchId) return;
-
-    if (!merchantVpa.trim() && !razorpayEnabled) {
-      setPaymentSaveError('Please enter a valid UPI ID (VPA), or enable Razorpay gateway.');
-      return;
-    }
 
     if (razorpayEnabled) {
       const cleanKey = razorpayKeyId.trim();
@@ -388,9 +372,6 @@ export const ShopOwnerDashboard: React.FC = () => {
           'Accept': 'application/json',
         },
         body: JSON.stringify({
-          merchant_vpa: merchantVpa.trim() || undefined,
-          merchant_name: merchantName.trim() || undefined,
-          soundbox_provider: soundboxProvider,
           razorpay_enabled: razorpayEnabled,
           razorpay_key_id: razorpayKeyId.trim() || null,
           razorpay_key_secret: razorpayKeySecret.trim() || null,
@@ -408,9 +389,6 @@ export const ShopOwnerDashboard: React.FC = () => {
       // Update in memory branches list
       setBranches(prev => prev.map(b => b.id === activeBranchId ? {
         ...b,
-        merchant_vpa: merchantVpa.trim(),
-        merchant_name: merchantName.trim() || b.name,
-        soundbox_provider: soundboxProvider,
         razorpay_enabled: razorpayEnabled,
         razorpay_key_id: razorpayKeyId.trim() || null,
         razorpay_key_secret: razorpayKeySecret.trim() || null,
@@ -696,7 +674,7 @@ export const ShopOwnerDashboard: React.FC = () => {
       <div class="instructions-title">HOW TO SELF-PRINT:</div>
       <div class="step-row"><strong>1. Scan QR Code</strong> with your phone camera</div>
       <div class="step-row"><strong>2. Upload PDF</strong> document & choose Color / B&W</div>
-      <div class="step-row"><strong>3. Pay via UPI / Soundbox</strong> & collect your print</div>
+      <div class="step-row"><strong>3. Pay Online (UPI / Card)</strong> & collect your print</div>
     </div>
 
     <div class="footer-note">
@@ -909,10 +887,10 @@ export const ShopOwnerDashboard: React.FC = () => {
               : 'text-slate-500 hover:text-slate-700'
           }`}
         >
-          <Wallet className="w-3.5 h-3.5" />
-          <span>UPI & Payments</span>
-          {!merchantVpa && (
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="UPI ID not set" />
+          <CreditCard className="w-3.5 h-3.5" />
+          <span>Payment Gateway</span>
+          {!razorpayEnabled && (
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Gateway not enabled" />
           )}
         </button>
 
@@ -1286,25 +1264,30 @@ export const ShopOwnerDashboard: React.FC = () => {
         </form>
       )}
 
-      {/* Tab: UPI & Online Payments Setup */}
+      {/* Tab: Razorpay Online Payment Gateway Setup */}
       {activeTab === 'payments' && (
         <div className="space-y-6">
           {/* Status Alert Banner */}
-          {merchantVpa ? (
+          {razorpayEnabled && razorpayKeyId ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-emerald-900">Direct Bank UPI Payments Active</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-emerald-900">Razorpay Auto-Print Gateway Active</h4>
+                    <span className="text-[10px] bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                      ⚡ Instant Spooler
+                    </span>
+                  </div>
                   <p className="text-[11px] text-emerald-700 mt-0.5">
-                    Customer terminal transfers are routed directly to <strong className="font-mono bg-emerald-100/70 px-1.5 py-0.5 rounded text-emerald-900">{merchantVpa}</strong> ({merchantName || 'Branch'})
+                    Customer payments (Cards, UPI, Netbanking) are verified automatically via Key <strong className="font-mono bg-emerald-100/70 px-1.5 py-0.5 rounded text-emerald-900">{razorpayKeyId.slice(0, 14)}...</strong> and print jobs are queued instantly.
                   </p>
                 </div>
               </div>
               <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-600 text-white uppercase tracking-wider shrink-0 self-start sm:self-center">
-                Live & Receiving Funds
+                Live & Automated
               </span>
             </div>
           ) : (
@@ -1314,25 +1297,28 @@ export const ShopOwnerDashboard: React.FC = () => {
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-amber-900">UPI ID Not Configured</h4>
+                  <h4 className="text-xs font-bold text-amber-900">Razorpay Gateway Not Active</h4>
                   <p className="text-[11px] text-amber-700 mt-0.5">
-                    Please configure your shop's UPI ID below so customers can scan and pay directly into your bank account.
+                    Configure your Razorpay API Key ID and Key Secret below to enable online customer checkout and instant zero-touch auto-printing.
                   </p>
                 </div>
               </div>
               <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-amber-500 text-white uppercase tracking-wider shrink-0 self-start sm:self-center">
-                Setup Required
+                Setup Recommended
               </span>
             </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column: UPI Configuration Form (7 cols) */}
+            {/* Left Column: Razorpay Configuration Form (7 cols) */}
             <form onSubmit={handleSavePayments} className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
               <div className="flex justify-between items-center pb-4 border-b border-slate-100">
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">Bank UPI & Soundbox Settings</h3>
-                  <p className="text-xs text-slate-500">Payments will be deposited directly to this UPI address</p>
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-indigo-600" />
+                    Razorpay Gateway (Instant Auto-Print)
+                  </h3>
+                  <p className="text-xs text-slate-500">Zero-staff counter printing triggered upon payment verification</p>
                 </div>
                 {paymentSaveSuccess && (
                   <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
@@ -1349,183 +1335,110 @@ export const ShopOwnerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Field 1: UPI ID (VPA) */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700">
-                  Shop UPI ID (Virtual Payment Address) <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Wallet className="w-4 h-4" />
+              {/* Master Enable/Disable Toggle */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-slate-900">
+                      Enable Razorpay Online Gateway
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Auto-Spooler
+                    </span>
                   </div>
+                  <p className="text-[11px] text-slate-500">
+                    When enabled, customer payments via Razorpay (UPI, Cards, Netbanking) instantly spool and print without manual counter approval.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input
-                    type="text"
-                    required
-                    value={merchantVpa}
-                    onChange={(e) => setMerchantVpa(e.target.value)}
-                    placeholder="e.g. 9876543210@paytm, midtown@okhdfcbank"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    type="checkbox"
+                    checked={razorpayEnabled}
+                    onChange={(e) => setRazorpayEnabled(e.target.checked)}
+                    className="sr-only peer"
                   />
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  GPay, PhonePe, Paytm, and BHIM transfers from customers will be credited to this UPI ID.
-                </p>
-
-                {/* Quick handle suggestions */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[10px] text-slate-400 font-semibold">Quick Suffixes:</span>
-                  {['@paytm', '@okhdfcbank', '@okaxis', '@ybl', '@ibl'].map(suffix => (
-                    <button
-                      type="button"
-                      key={suffix}
-                      onClick={() => {
-                        const base = merchantVpa.split('@')[0];
-                        if (base) setMerchantVpa(`${base}${suffix}`);
-                        else setMerchantVpa(`shop${suffix}`);
-                      }}
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-mono transition-colors cursor-pointer"
-                    >
-                      {suffix}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Field 2: Merchant Display Name */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700">
-                  Payee / Business Display Name
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Store className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={merchantName}
-                    onChange={(e) => setMerchantName(e.target.value)}
-                    placeholder="e.g. Midtown Stationary & Cyber Cafe"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Shown to the customer on their UPI payment screen as the payee name.
-                </p>
               </div>
 
-              {/* Field 3: Verification & Soundbox Provider */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700">
-                  Counter Payment Verification & Hardware Soundbox
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {[
-                    { id: 'paytm', name: 'Paytm Soundbox', desc: 'Paytm for Business speaker & webhook', badge: 'Recommended' },
-                    { id: 'phonepe', name: 'PhonePe SmartSpeaker', desc: 'PhonePe Business merchant notifications', badge: 'Popular' },
-                    { id: 'gpay', name: 'Google Pay Soundbox', desc: 'Google Pay for Business device', badge: 'Standard' },
-                    { id: 'direct_upi', name: 'Direct UPI / Manual', desc: 'Counter staff checks phone & prints', badge: 'Self-Serve' },
-                  ].map(provider => (
-                    <div
-                      key={provider.id}
-                      onClick={() => setSoundboxProvider(provider.id)}
-                      className={`p-3 rounded-xl border-2 flex flex-col justify-between cursor-pointer transition-all ${
-                        soundboxProvider === provider.id
-                          ? 'border-indigo-600 bg-indigo-50/40 text-indigo-900'
-                          : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-xs">{provider.name}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                          soundboxProvider === provider.id
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {provider.badge}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-tight">{provider.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Field 4: Razorpay Online Payment Gateway (Instant Auto-Print) */}
-              <div className="pt-4 border-t border-slate-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-                        <CreditCard className="w-4 h-4 text-indigo-600" />
-                        Razorpay Gateway (Instant Auto-Print)
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> Auto-Spooler
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      When enabled, customer payments via Razorpay (UPI, Cards, Netbanking) instantly spool and print without manual counter approval.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={razorpayEnabled}
-                      onChange={(e) => setRazorpayEnabled(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              {/* API Credentials */}
+              <div className="space-y-4">
+                {/* Razorpay Key ID */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Razorpay Key ID <span className="text-rose-500">*</span>
                   </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      value={razorpayKeyId}
+                      onChange={(e) => setRazorpayKeyId(e.target.value)}
+                      placeholder="rzp_live_xxxxxxxxxxxxxx or rzp_test_xxxxxxxxxxxxxx"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Found in your Razorpay Dashboard &rarr; Account & Settings &rarr; API Keys. Must start with <code className="text-indigo-600 font-bold">rzp_live_</code> or <code className="text-indigo-600 font-bold">rzp_test_</code>.
+                  </p>
                 </div>
 
-                {razorpayEnabled && (
-                  <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl space-y-3">
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-bold text-slate-700">
-                        Razorpay Key ID <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={razorpayKeyId}
-                        onChange={(e) => setRazorpayKeyId(e.target.value)}
-                        placeholder="rzp_live_xxxxxxxxxxxxxx or rzp_test_xxxxxxxxxxxxxx"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <p className="text-[10px] text-slate-500">
-                        Found in your Razorpay Dashboard &rarr; Settings &rarr; API Keys.
-                      </p>
+                {/* Razorpay Key Secret */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Razorpay Key Secret <span className="text-rose-500">*</span>
+                    <span className="text-slate-400 font-normal ml-1.5">(stored securely in branch settings, never exposed publicly)</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <ShieldCheck className="w-4 h-4" />
                     </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-bold text-slate-700">
-                        Razorpay Key Secret <span className="text-slate-400 font-normal">(stored securely, never exposed to customers)</span>
-                      </label>
-                      <input
-                        type="password"
-                        value={razorpayKeySecret}
-                        onChange={(e) => setRazorpayKeySecret(e.target.value)}
-                        placeholder="Enter key secret"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <p className="text-[10px] text-slate-500">
-                        Used to verify checkout HMAC-SHA256 signatures before queueing print jobs.
-                      </p>
-                    </div>
-
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold">Zero-touch Counter Flow:</span> Customers can pay directly using Razorpay &rarr; signature is verified &rarr; print job is instantly queued on your active Windows desktop printer!
-                      </div>
-                    </div>
+                    <input
+                      type="password"
+                      value={razorpayKeySecret}
+                      onChange={(e) => setRazorpayKeySecret(e.target.value)}
+                      placeholder="Enter Razorpay Key Secret"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
                   </div>
-                )}
+                  <p className="text-[11px] text-slate-500">
+                    Used to cryptographically verify HMAC-SHA256 signatures before queueing print jobs on your Windows printer.
+                  </p>
+                </div>
+              </div>
+
+              {/* Zero Staff Interaction Flow Info Box */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-[11px] text-emerald-800 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-emerald-900">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Zero-Staff Autonomous Counter Flow:</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[10px] pt-1">
+                  <div className="bg-white/80 p-2 rounded-xl border border-emerald-200/60">
+                    <span className="font-bold text-emerald-900 block mb-0.5">1. Scan & Upload</span>
+                    Customer scans shop QR and uploads document
+                  </div>
+                  <div className="bg-white/80 p-2 rounded-xl border border-emerald-200/60">
+                    <span className="font-bold text-emerald-900 block mb-0.5">2. Razorpay Pay</span>
+                    Customer pays via UPI, Card, or Netbanking
+                  </div>
+                  <div className="bg-white/80 p-2 rounded-xl border border-emerald-200/60">
+                    <span className="font-bold text-emerald-900 block mb-0.5">3. Signature Verified</span>
+                    HMAC signature validates payment directly
+                  </div>
+                  <div className="bg-white/80 p-2 rounded-xl border border-emerald-200/60">
+                    <span className="font-bold text-emerald-900 block mb-0.5">4. Auto-Printed</span>
+                    Windows Agent immediately prints document
+                  </div>
+                </div>
               </div>
 
               {/* Save Button */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                 <div className="text-[11px] text-slate-500">
-                  Changes take effect immediately on counter terminals.
+                  Settings take effect immediately for customer checkouts.
                 </div>
                 <button
                   type="submit"
@@ -1533,98 +1446,37 @@ export const ShopOwnerDashboard: React.FC = () => {
                   className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {savingPayments ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  <span>Save Payment Settings</span>
+                  <span>Save Gateway Settings</span>
                 </button>
               </div>
             </form>
 
-            {/* Right Column: Live Terminal Simulator & Webhook Guide (5 cols) */}
+            {/* Right Column: Webhook & Integration Guide (5 cols) */}
             <div className="lg:col-span-5 space-y-6">
-              {/* Dynamic Customer Terminal Preview */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <QrCode className="w-4 h-4 text-indigo-600" />
-                    <h4 className="font-bold text-xs text-slate-900">Customer Mobile Terminal Preview</h4>
-                  </div>
-                  <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                    Live Preview
-                  </span>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center space-y-3">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                      {soundboxProvider === 'phonepe' ? 'PhonePe SmartSpeaker' : 'Paytm Soundbox'} Active
-                    </span>
-                    <h5 className="text-sm font-extrabold text-slate-900">Scan & Pay ₹10.00</h5>
-                    <p className="text-[11px] text-slate-600">
-                      Paying: <strong className="text-slate-800">{merchantName || 'Midtown Stationary'}</strong>
-                    </p>
-                    <p className="text-[10px] font-mono text-indigo-600 font-semibold">
-                      {merchantVpa || 'your-upi-id@bank'}
-                    </p>
-                  </div>
-
-                  {/* QR Image */}
-                  <div className="inline-block p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(
-                        `upi://pay?pa=${merchantVpa || 'merchant@upi'}&pn=${encodeURIComponent(merchantName || 'Shop')}&am=10.00&cu=INR&tn=PrintEase Order Payment`
-                      )}`}
-                      alt="UPI QR Code Preview"
-                      className="w-32 h-32 mx-auto"
-                    />
-                  </div>
-
-                  {/* UPI Apps preview */}
-                  <div className="flex justify-center gap-1.5 pt-1">
-                    <span className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded text-[10px] font-bold">
-                      GPay
-                    </span>
-                    <span className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-700 rounded text-[10px] font-bold">
-                      PhonePe
-                    </span>
-                    <span className="px-2.5 py-1 bg-sky-50 border border-sky-200 text-sky-700 rounded text-[10px] font-bold">
-                      Paytm
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  💡 <strong>How it works:</strong> When a customer selects copies and page range at your counter, PrintEase generates this dynamic QR code with your UPI ID. All funds go directly into your linked bank account!
-                </div>
-              </div>
-
-              {/* Soundbox Webhook Integration Guide */}
+              {/* Razorpay Webhook Configuration Guide */}
               <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2 text-indigo-300">
-                  <Volume2 className="w-5 h-5 text-indigo-400" />
-                  <h4 className="font-bold text-xs uppercase tracking-wider text-white">Instant Soundbox Webhook</h4>
+                  <Sparkles className="w-5 h-5 text-indigo-400" />
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-white">Razorpay Webhook (Instant Spooler)</h4>
                 </div>
 
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  To automatically trigger printing when your counter Soundbox announces payment, paste this webhook in your <strong>Paytm for Business</strong> or <strong>PhonePe Merchant</strong> dashboard:
+                  Add this webhook in your <strong>Razorpay Dashboard &rarr; Account & Settings &rarr; Webhooks</strong> so our server gets instant print notifications even if the customer accidentally closes their browser:
                 </p>
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-bold text-indigo-300 tracking-wider">
-                      Shop-Specific Webhook Endpoint:
+                      Webhook URL:
                     </span>
-                    {posterData?.qr_token && (
-                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono">
-                        Branch: {posterData.qr_token.slice(0, 10)}...
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700 rounded-xl p-2.5 font-mono text-[11px] text-emerald-400">
                     <span className="truncate flex-1">
-                      {window.location.origin}/api/soundbox/{soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}{posterData?.qr_token ? `/${posterData.qr_token}` : ''}
+                      {window.location.origin}/api/webhooks/razorpay
                     </span>
                     <button
                       type="button"
-                      onClick={() => handleCopyWebhook(`${window.location.origin}/api/soundbox/${soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}${posterData?.qr_token ? `/${posterData.qr_token}` : ''}`)}
+                      onClick={() => handleCopyWebhook(`${window.location.origin}/api/webhooks/razorpay`)}
                       className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
                     >
                       {copiedWebhookUrl ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -1633,14 +1485,63 @@ export const ShopOwnerDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-[10px] text-slate-400 bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50 leading-relaxed">
-                  ℹ️ <strong>Auto-Tenant Routing:</strong> Aap chahe ye shop-specific URL dalein ya base URL (<code>/api/soundbox/{soundboxProvider === 'phonepe' ? 'phonepe' : 'paytm'}</code>), PrintEase har order ke unique Order ID se payment ko automatic 100% sahi shop aur printer par route karta hai.
+                <div className="space-y-1 text-[11px] text-slate-300 bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                  <span className="font-bold text-indigo-300 block mb-1">Active Webhook Events to Select:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="px-2 py-0.5 bg-emerald-900/60 border border-emerald-600/40 text-emerald-300 rounded font-mono text-[10px]">
+                      payment.captured
+                    </span>
+                    <span className="px-2 py-0.5 bg-emerald-900/60 border border-emerald-600/40 text-emerald-300 rounded font-mono text-[10px]">
+                      order.paid
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
                   <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Secure bank verification ensures zero unpaid prints.</span>
+                  <span>Direct API verification prevents unpaid prints.</span>
                 </div>
+              </div>
+
+              {/* Supported Payment Channels */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <h4 className="font-bold text-xs text-slate-900">Supported Customer Payment Methods</h4>
+                  <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded">
+                    Included via Razorpay
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span><strong>UPI Apps:</strong> Google Pay, PhonePe, Paytm, BHIM, CRED</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span><strong>Cards:</strong> Visa, MasterCard, RuPay, Maestro Credit & Debit</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span><strong>Netbanking:</strong> 50+ Indian banks (SBI, HDFC, ICICI, Axis, etc.)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span><strong>Wallets:</strong> Amazon Pay, Mobikwik, Airtel Money, Freecharge</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4-Step Setup Checklist */}
+              <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-5 space-y-2.5 text-xs text-indigo-950">
+                <span className="font-bold uppercase text-[10px] text-indigo-600 tracking-wider block">
+                  Quick Setup Checklist
+                </span>
+                <ol className="space-y-1.5 text-[11px] list-decimal list-inside text-indigo-900/80">
+                  <li>Log in to <a href="https://dashboard.razorpay.com" target="_blank" rel="noreferrer" className="text-indigo-600 font-bold underline">dashboard.razorpay.com</a></li>
+                  <li>Go to <strong>Account & Settings &rarr; API Keys</strong></li>
+                  <li>Copy <strong>Key ID</strong> and <strong>Key Secret</strong> and paste on the left</li>
+                  <li>Click <strong>Save Gateway Settings</strong></li>
+                </ol>
               </div>
             </div>
           </div>

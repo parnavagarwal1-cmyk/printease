@@ -565,35 +565,37 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
           {!(paymentSuccess || createdOrder.status === 'PRINT_QUEUED' || createdOrder.status === 'COMPLETED') ? (
             <div className="max-w-md mx-auto space-y-4">
-              {/* Payment Method Selector */}
-              <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-600">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('soundbox')}
-                  className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    paymentMethod === 'soundbox' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
-                  }`}
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>Shop Soundbox / UPI</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('razorpay')}
-                  className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    paymentMethod === 'razorpay' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
-                  }`}
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>Online / Razorpay</span>
-                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full ml-1">
-                    ⚡ Auto-Print
-                  </span>
-                </button>
-              </div>
+              {/* Payment Method Selector (Only shown when shop has manual soundbox/VPA configured) */}
+              {Boolean(upiData?.merchant_vpa) && (
+                <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('soundbox')}
+                    className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      paymentMethod === 'soundbox' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>Shop Soundbox / UPI</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('razorpay')}
+                    className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      paymentMethod === 'razorpay' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Online / Razorpay</span>
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full ml-1">
+                      ⚡ Auto-Print
+                    </span>
+                  </button>
+                </div>
+              )}
 
               {/* METHOD 1: Shop Soundbox / Dynamic UPI QR */}
-              {paymentMethod === 'soundbox' && (
+              {paymentMethod === 'soundbox' && Boolean(upiData?.merchant_vpa) && (
                 <div className="bg-white border-2 border-indigo-100 rounded-3xl p-5 shadow-xs text-center space-y-4">
                   <div className="space-y-1">
                     <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
@@ -674,7 +676,7 @@ export const CustomerPrintPortal: React.FC<Props> = ({
               )}
 
               {/* METHOD 2: Razorpay Gateway */}
-              {paymentMethod === 'razorpay' && (
+              {(paymentMethod === 'razorpay' || !upiData?.merchant_vpa) && (
                 <div className="space-y-3">
                   <button
                     onClick={handlePayNow}
