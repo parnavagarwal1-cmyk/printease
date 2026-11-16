@@ -18,7 +18,8 @@ import {
   ShieldCheck, 
   Trash2,
   TrendingUp,
-  CreditCard
+  CreditCard,
+  Download
 } from 'lucide-react';
 
 export const ShopOwnerDashboard: React.FC = () => {
@@ -1613,6 +1614,33 @@ export const ShopOwnerDashboard: React.FC = () => {
       {/* Tab 4: Hardware & Windows Agents */}
       {activeTab === 'hardware' && (
         <div className="space-y-6">
+          {/* Download Windows Agent Card */}
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-lg border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-bold border border-indigo-400/30 uppercase tracking-wide">
+                <span>Windows Desktop Engine</span>
+              </div>
+              <h3 className="text-lg font-black tracking-tight text-white">
+                Download PrintEase Windows Agent
+              </h3>
+              <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                Install this desktop app on the counter Windows PC connected to your printer (USB or Wi-Fi). It runs silently in the background and prints customer jobs automatically upon payment.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+              <a
+                href="https://github.com/parnavagarwal1-cmyk/printease/releases/latest/download/PrintEase-Setup-1.0.0.exe"
+                target="_blank"
+                rel="noreferrer"
+                className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download for Windows (.exe)</span>
+              </a>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <div>
