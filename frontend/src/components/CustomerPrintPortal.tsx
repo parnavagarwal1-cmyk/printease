@@ -17,7 +17,10 @@ import {
   Palette, 
   Volume2, 
   ArrowRight, 
-  RotateCcw 
+  RotateCcw,
+  Eye,
+  Maximize2,
+  X
 } from 'lucide-react';
 import type { 
   QrResolutionResponse, 
@@ -43,6 +46,12 @@ export const CustomerPrintPortal: React.FC<Props> = ({
   const [uploadedFile, setUploadedFile] = useState<UploadedFileMeta | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Print Preview state
+  const [localFileUrl, setLocalFileUrl] = useState<string | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
+  const [previewOrientation, setPreviewOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [previewDuplexSide, setPreviewDuplexSide] = useState<'front' | 'back'>('front');
 
   // Print Configuration state
   const [colorMode, setColorMode] = useState<'bw' | 'color'>('bw');
@@ -138,6 +147,16 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       return;
     }
 
+    try {
+      const objUrl = URL.createObjectURL(file);
+      if (localFileUrl) {
+        URL.revokeObjectURL(localFileUrl);
+      }
+      setLocalFileUrl(objUrl);
+    } catch (urlErr) {
+      console.warn('Could not generate client blob URL for preview:', urlErr);
+    }
+
     setUploading(true);
     setUploadError(null);
 
@@ -163,6 +182,16 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleResetFile = () => {
+    if (localFileUrl) {
+      URL.revokeObjectURL(localFileUrl);
+    }
+    setLocalFileUrl(null);
+    setUploadedFile(null);
+    setEstimate(null);
+    setShowPreviewModal(false);
   };
 
   // 3. Live Pricing Estimate
@@ -837,13 +866,24 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setUploadedFile(null)}
-                  className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-white bg-slate-100 transition-colors shrink-0 cursor-pointer"
-                >
-                  Change File
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowPreviewModal(true)}
+                    className="text-xs font-bold text-indigo-700 hover:text-indigo-800 px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Open Print Preview"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Print Preview</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetFile}
+                    className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-white bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Change File
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1060,6 +1100,141 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                 )}
               </div>
 
+              {/* Live Print Simulation Card */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Simulated Print Output Preview
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreviewModal(true)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Expand Full Preview</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+                  {/* Paper sheet preview container */}
+                  <div className="relative flex items-center justify-center p-3 bg-slate-100 rounded-lg overflow-hidden border border-slate-300/80 shadow-inner">
+                    <div
+                      className={`relative bg-white shadow-md border border-slate-300 transition-all duration-300 flex items-center justify-center overflow-hidden ${
+                        previewOrientation === 'portrait'
+                          ? 'w-28 h-36'
+                          : 'w-36 h-28'
+                      }`}
+                      style={{
+                        filter: colorMode === 'bw' ? 'grayscale(100%) contrast(1.15) brightness(0.98)' : 'none',
+                      }}
+                    >
+                      {localFileUrl ? (
+                        /\.(jpg|jpeg|png)$/i.test(uploadedFile.original_name) ? (
+                          <img
+                            src={localFileUrl}
+                            alt="Document Preview"
+                            className="w-full h-full object-contain p-1"
+                          />
+                        ) : /\.(pdf)$/i.test(uploadedFile.original_name) ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center select-none bg-slate-50">
+                            <span className="font-mono text-[9px] text-slate-400 font-bold mb-1">PDF Page 1</span>
+                            <div className="w-4/5 h-1.5 bg-slate-300 rounded mb-1"></div>
+                            <div className="w-full h-1 bg-slate-200 rounded mb-1"></div>
+                            <div className="w-3/4 h-1 bg-slate-200 rounded mb-1"></div>
+                            <div className="w-5/6 h-1 bg-slate-200 rounded mb-1.5"></div>
+                            <span className="text-[8px] font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-200">
+                              {colorMode === 'bw' ? 'Mono B&W' : 'Color'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center select-none bg-slate-50">
+                            <span className="font-mono text-[9px] text-slate-400 font-bold mb-1">DOCX</span>
+                            <div className="w-4/5 h-1.5 bg-blue-300 rounded mb-1"></div>
+                            <div className="w-full h-1 bg-slate-200 rounded mb-1"></div>
+                            <div className="w-3/4 h-1 bg-slate-200 rounded mb-1"></div>
+                            <span className="text-[8px] font-bold text-slate-600">
+                              {colorMode === 'bw' ? 'B&W Print' : 'Color Print'}
+                            </span>
+                          </div>
+                        )
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400">
+                          Preview
+                        </div>
+                      )}
+
+                      {/* Paper watermark tag */}
+                      <span className="absolute bottom-1 right-1 text-[8px] font-mono font-bold text-slate-400 bg-white/80 px-1 rounded shadow-2xs">
+                        {paperSize}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Preview quick options & explanation */}
+                  <div className="flex-1 space-y-2 text-left">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700">Preview Layout:</span>
+                      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewOrientation('portrait')}
+                          className={`px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                            previewOrientation === 'portrait' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          Portrait
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewOrientation('landscape')}
+                          className={`px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                            previewOrientation === 'landscape' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          Landscape
+                        </button>
+                      </div>
+
+                      {duplexMode === 'duplex' && (
+                        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDuplexSide('front')}
+                            className={`px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                              previewDuplexSide === 'front' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            Front Side
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDuplexSide('back')}
+                            className={`px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                              previewDuplexSide === 'back' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-500 hover:text-slate-900'
+                            }`}
+                          >
+                            Back Side
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Showing real-time simulated appearance for{' '}
+                      <strong className="text-slate-800">
+                        {colorMode === 'bw' ? 'Black & White (Monochrome Grayscale)' : 'Full Color'}
+                      </strong>{' '}
+                      on <strong className="text-slate-800">{paperSize}</strong> paper (
+                      {duplexMode === 'duplex' ? 'Double-Sided' : 'Single-Sided'}).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Live Cost Estimation Bar */}
               {estimate && (
                 <div className="bg-gradient-to-r from-indigo-50 to-indigo-50/40 border border-indigo-100 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1169,6 +1344,135 @@ export const CustomerPrintPortal: React.FC<Props> = ({
           )}
         </div>
       ))}
+
+      {/* Full-screen Print Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                    <span>Print Preview Inspection</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-indigo-100 text-indigo-700">
+                      {paperSize} • {colorMode === 'bw' ? 'B&W Grayscale' : 'Full Color'}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Verify orientation and visual ink simulation before dispatching to the counter printer.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-200/80 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Simulation Toolbar */}
+            <div className="px-5 py-2.5 bg-slate-100 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">Color Mode:</span>
+                <span className={`px-2 py-1 rounded-md font-bold uppercase ${colorMode === 'bw' ? 'bg-slate-800 text-white' : 'bg-gradient-to-r from-pink-500 via-amber-500 to-indigo-500 text-white'}`}>
+                  {colorMode === 'bw' ? 'B&W Grayscale Filter' : 'Full Color'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">Orientation:</span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewOrientation('portrait')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${previewOrientation === 'portrait' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:bg-white/60'}`}
+                >
+                  Portrait (Vertical)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewOrientation('landscape')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${previewOrientation === 'landscape' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:bg-white/60'}`}
+                >
+                  Landscape (Horizontal)
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / Viewer */}
+            <div className="flex-1 overflow-auto p-6 bg-slate-200/60 flex items-center justify-center min-h-[350px]">
+              <div
+                className={`bg-white shadow-xl rounded-lg p-2 transition-all flex items-center justify-center ${
+                  previewOrientation === 'portrait' ? 'max-w-md w-full aspect-[210/297]' : 'max-w-xl w-full aspect-[297/210]'
+                }`}
+                style={{
+                  filter: colorMode === 'bw' ? 'grayscale(100%) contrast(1.15) brightness(0.98)' : 'none',
+                }}
+              >
+                {localFileUrl ? (
+                  /\.(jpg|jpeg|png)$/i.test(uploadedFile?.original_name || '') ? (
+                    <img
+                      src={localFileUrl}
+                      alt="Print Document Preview"
+                      className="w-full h-full object-contain rounded"
+                    />
+                  ) : /\.(pdf)$/i.test(uploadedFile?.original_name || '') ? (
+                    <object
+                      data={localFileUrl}
+                      type="application/pdf"
+                      className="w-full h-full rounded"
+                    >
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-xs text-slate-500 space-y-2">
+                        <p className="font-bold text-slate-700">PDF Document Ready for Printing</p>
+                        <p>{uploadedFile?.original_name} ({uploadedFile?.page_count} pages)</p>
+                        <a
+                          href={localFileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 inline-block"
+                        >
+                          Open in New Tab
+                        </a>
+                      </div>
+                    </object>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-xs text-slate-600 space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-slate-800 text-sm">{uploadedFile?.original_name}</p>
+                      <p className="text-slate-500 max-w-xs">
+                        Word document will be converted and rendered directly to {paperSize} paper with {colorMode === 'bw' ? 'Black & White' : 'Color'} formatting.
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  <p className="text-xs text-slate-400">No document loaded</p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 bg-white flex justify-between items-center">
+              <span className="text-xs text-slate-500">
+                Printed via shop spooler with 300+ DPI high fidelity.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(false)}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-sm"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
