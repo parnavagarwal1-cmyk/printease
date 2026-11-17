@@ -49,7 +49,8 @@ if ($existingSgId -and $existingSgId -ne "None") {
 Write-Host "`n[4/5] Checking SSH Key Pair 'printease-key'..." -ForegroundColor Yellow
 $keyCheck = aws ec2 describe-key-pairs --filters "Name=key-name,Values=printease-key" --region $Region --profile $Profile --query "KeyPairs[0].KeyName" --output text
 if (-not $keyCheck -or $keyCheck -eq "None") {
-    aws ec2 create-key-pair --key-name "printease-key" --region $Region --profile $Profile --query "KeyMaterial" --output text > "printease-key.pem"
+    $keyMat = aws ec2 create-key-pair --key-name "printease-key" --region $Region --profile $Profile --query "KeyMaterial" --output text
+    [System.IO.File]::WriteAllText("$PSScriptRoot\..\printease-key.pem", $keyMat)
     Write-Host "✓ Created new SSH Key: printease-key.pem" -ForegroundColor Green
 } else {
     Write-Host "✓ Key pair 'printease-key' already registered." -ForegroundColor Green
