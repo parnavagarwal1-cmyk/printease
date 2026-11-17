@@ -199,7 +199,7 @@ class PublicOrderController extends Controller
 
         $validated = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
-            'customer_phone' => ['required', 'string', 'max:20'],
+            'customer_phone' => ['nullable', 'string', 'max:20'],
             'customer_email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
             'files' => ['required', 'array', 'min:1'],
@@ -254,7 +254,7 @@ class PublicOrderController extends Controller
                 'branch_id' => $branch->id,
                 'order_number' => $orderNumber,
                 'customer_name' => $validated['customer_name'],
-                'customer_phone' => $validated['customer_phone'],
+                'customer_phone' => $validated['customer_phone'] ?? null,
                 'customer_email' => $validated['customer_email'] ?? null,
                 'subtotal_amount' => $pricing['subtotal'],
                 'tax_amount' => $pricing['tax_amount'],

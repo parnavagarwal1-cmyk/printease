@@ -20,7 +20,8 @@ import {
   RotateCcw,
   Eye,
   Maximize2,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 import type { 
   QrResolutionResponse, 
@@ -67,8 +68,6 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
   // Customer contact state
   const [customerName, setCustomerName] = useState<string>('');
-  const [customerPhone, setCustomerPhone] = useState<string>('');
-  const [customerNotes, setCustomerNotes] = useState<string>('');
 
   // Order submission state
   const [submittingOrder, setSubmittingOrder] = useState<boolean>(false);
@@ -239,21 +238,21 @@ export const CustomerPrintPortal: React.FC<Props> = ({
     e.preventDefault();
     if (!uploadedFile || !branchData) return;
 
+    if (!customerName.trim()) {
+      setOrderError('Please enter your name.');
+      return;
+    }
+
     setSubmittingOrder(true);
     setOrderError(null);
 
     try {
-      const digitsOnly = customerPhone.replace(/[^0-9]/g, '');
-      if (customerPhone.trim() && digitsOnly.length !== 10) {
-        throw new Error('Please enter a valid 10-digit mobile number (e.g. 9876543210).');
-      }
-
       const range = pageRangeMode === 'custom' ? customPageRange : 'all';
       const payload = {
-        customer_name: customerName.trim() || 'Counter Customer',
-        customer_phone: customerPhone.trim() || '9876543210',
+        customer_name: customerName.trim(),
+        customer_phone: null,
         customer_email: null,
-        notes: customerNotes.trim() || null,
+        notes: null,
         files: [
           {
             original_name: uploadedFile.original_name,
@@ -1120,8 +1119,12 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-                  {/* Paper sheet preview container */}
-                  <div className="relative flex items-center justify-center p-3 bg-slate-100 rounded-lg overflow-hidden border border-slate-300/80 shadow-inner">
+                  {/* Paper sheet preview container (clickable to expand) */}
+                  <div
+                    onClick={() => setShowPreviewModal(true)}
+                    title="Click to view full print preview"
+                    className="relative flex items-center justify-center p-3 bg-slate-100 rounded-xl overflow-hidden border border-slate-300/80 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group shrink-0"
+                  >
                     <div
                       className={`relative bg-white shadow-md border border-slate-300 transition-all duration-300 flex items-center justify-center overflow-hidden ${
                         previewOrientation === 'portrait'
@@ -1275,45 +1278,20 @@ export const CustomerPrintPortal: React.FC<Props> = ({
                 </div>
                 <div>
                   <h2 className="font-bold text-slate-900 text-base">Customer Details</h2>
-                  <p className="text-xs text-slate-500">Provide your name so the shop operator can hand you your prints</p>
+                  <p className="text-xs text-slate-500">Enter your name to label your prints for easy pickup at the counter</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Rahul Sharma"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Mobile Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="e.g. 9876543210"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">Special Note for Shopkeeper (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Corner staple, spiral binding, keep ready by 5 PM"
-                    value={customerNotes}
-                    onChange={(e) => setCustomerNotes(e.target.value)}
-                    className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
+              <div className="space-y-1.5 max-w-md">
+                <label className="text-xs font-bold text-slate-700">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full text-xs font-medium px-4 py-3 rounded-2xl border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
               </div>
 
               {orderError && (
@@ -1347,128 +1325,160 @@ export const CustomerPrintPortal: React.FC<Props> = ({
 
       {/* Full-screen Print Preview Modal */}
       {showPreviewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/85 backdrop-blur-xs p-2 sm:p-4 flex flex-col items-center justify-start sm:justify-center animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl max-h-[94vh] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden my-auto">
+            {/* Modal Header (Fixed at top of modal, never scrolls off) */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
                   <Eye className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                    <span>Print Preview Inspection</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-indigo-100 text-indigo-700">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2 flex-wrap">
+                    <span>Print Preview</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                       {paperSize} • {colorMode === 'bw' ? 'B&W Grayscale' : 'Full Color'}
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Verify orientation and visual ink simulation before dispatching to the counter printer.
+                  <p className="text-xs text-slate-500 truncate">
+                    High-res simulation of your physical print output
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-200/80 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {localFileUrl && (
+                  <a
+                    href={localFileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:text-indigo-700 hover:bg-slate-50 text-xs font-bold transition-colors cursor-pointer"
+                    title="Open full document in new tab"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open in New Tab</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Close Preview"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Simulation Toolbar */}
-            <div className="px-5 py-2.5 bg-slate-100 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
               <div className="flex items-center gap-2">
-                <span className="text-slate-500 font-medium">Color Mode:</span>
-                <span className={`px-2 py-1 rounded-md font-bold uppercase ${colorMode === 'bw' ? 'bg-slate-800 text-white' : 'bg-gradient-to-r from-pink-500 via-amber-500 to-indigo-500 text-white'}`}>
-                  {colorMode === 'bw' ? 'B&W Grayscale Filter' : 'Full Color'}
+                <span className="text-slate-500 font-semibold">Simulated Ink:</span>
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase ${
+                  colorMode === 'bw' 
+                    ? 'bg-slate-900 text-white shadow-xs' 
+                    : 'bg-gradient-to-r from-pink-500 via-amber-500 to-indigo-600 text-white shadow-xs'
+                }`}>
+                  {colorMode === 'bw' ? 'B&W Monochrome' : 'Color Ink'}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-slate-500 font-medium">Orientation:</span>
-                <button
-                  type="button"
-                  onClick={() => setPreviewOrientation('portrait')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${previewOrientation === 'portrait' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:bg-white/60'}`}
-                >
-                  Portrait (Vertical)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewOrientation('landscape')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${previewOrientation === 'landscape' ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:bg-white/60'}`}
-                >
-                  Landscape (Horizontal)
-                </button>
+                <span className="text-slate-500 font-semibold">Orientation:</span>
+                <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewOrientation('portrait')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      previewOrientation === 'portrait' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Portrait (Vertical)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewOrientation('landscape')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      previewOrientation === 'landscape' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Landscape (Horizontal)
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Modal Body / Viewer */}
-            <div className="flex-1 overflow-auto p-6 bg-slate-200/60 flex items-center justify-center min-h-[350px]">
-              <div
-                className={`bg-white shadow-xl rounded-lg p-2 transition-all flex items-center justify-center ${
-                  previewOrientation === 'portrait' ? 'max-w-md w-full aspect-[210/297]' : 'max-w-xl w-full aspect-[297/210]'
-                }`}
-                style={{
-                  filter: colorMode === 'bw' ? 'grayscale(100%) contrast(1.15) brightness(0.98)' : 'none',
-                }}
-              >
-                {localFileUrl ? (
-                  /\.(jpg|jpeg|png)$/i.test(uploadedFile?.original_name || '') ? (
+            {/* Modal Body / Viewer (Starts cleanly from the TOP, never clips document header) */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100/90 flex flex-col items-center justify-start min-h-[420px]">
+              {localFileUrl ? (
+                /\.(jpg|jpeg|png)$/i.test(uploadedFile?.original_name || '') ? (
+                  <div
+                    className="bg-white shadow-2xl rounded-2xl p-3 sm:p-5 border border-slate-300 max-w-full my-auto transition-all"
+                    style={{
+                      filter: colorMode === 'bw' ? 'grayscale(100%) contrast(1.15) brightness(0.98)' : 'none',
+                    }}
+                  >
                     <img
                       src={localFileUrl}
                       alt="Print Document Preview"
-                      className="w-full h-full object-contain rounded"
+                      className="max-w-full max-h-[68vh] object-contain rounded-lg mx-auto"
                     />
-                  ) : /\.(pdf)$/i.test(uploadedFile?.original_name || '') ? (
-                    <object
-                      data={localFileUrl}
-                      type="application/pdf"
-                      className="w-full h-full rounded"
-                    >
-                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-xs text-slate-500 space-y-2">
-                        <p className="font-bold text-slate-700">PDF Document Ready for Printing</p>
-                        <p>{uploadedFile?.original_name} ({uploadedFile?.page_count} pages)</p>
-                        <a
-                          href={localFileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 inline-block"
-                        >
-                          Open in New Tab
-                        </a>
-                      </div>
-                    </object>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-xs text-slate-600 space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
-                        <FileText className="w-6 h-6" />
-                      </div>
-                      <p className="font-bold text-slate-800 text-sm">{uploadedFile?.original_name}</p>
-                      <p className="text-slate-500 max-w-xs">
-                        Word document will be converted and rendered directly to {paperSize} paper with {colorMode === 'bw' ? 'Black & White' : 'Color'} formatting.
-                      </p>
-                    </div>
-                  )
+                  </div>
+                ) : /\.(pdf)$/i.test(uploadedFile?.original_name || '') ? (
+                  <div
+                    className={`bg-white shadow-2xl rounded-2xl transition-all border border-slate-300 overflow-hidden w-full flex flex-col ${
+                      previewOrientation === 'portrait' ? 'max-w-2xl h-[65vh] sm:h-[72vh]' : 'max-w-4xl h-[60vh] sm:h-[68vh]'
+                    }`}
+                    style={{
+                      filter: colorMode === 'bw' ? 'grayscale(100%) contrast(1.15) brightness(0.98)' : 'none',
+                    }}
+                  >
+                    <iframe
+                      src={`${localFileUrl}#toolbar=0&navpanes=0&scrollbar=1&page=1&view=FitH`}
+                      title="PDF Print Preview"
+                      className="w-full h-full border-0 bg-white"
+                    />
+                  </div>
                 ) : (
-                  <p className="text-xs text-slate-400">No document loaded</p>
-                )}
-              </div>
+                  <div className="w-full max-w-md bg-white shadow-xl rounded-2xl p-8 text-center text-xs text-slate-600 space-y-3 border border-slate-200 my-auto">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
+                      <FileText className="w-6 h-6" />
+                    </div>
+                    <p className="font-bold text-slate-800 text-sm">{uploadedFile?.original_name}</p>
+                    <p className="text-slate-500 max-w-xs mx-auto leading-relaxed">
+                      Word document layout is preserved and will print onto {paperSize} paper with {colorMode === 'bw' ? 'Black & White monochrome' : 'Color'} inks.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div className="my-auto text-xs text-slate-400">No document loaded</div>
+              )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-200 bg-white flex justify-between items-center">
-              <span className="text-xs text-slate-500">
-                Printed via shop spooler with 300+ DPI high fidelity.
+            <div className="p-3.5 sm:p-4 border-t border-slate-200 bg-white flex justify-between items-center shrink-0">
+              <span className="text-xs text-slate-500 font-medium">
+                Simulated {colorMode === 'bw' ? 'Monochrome Black & White' : 'Full Color'} output ({paperSize})
               </span>
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-sm"
-              >
-                Close Preview
-              </button>
+              <div className="flex items-center gap-2">
+                {localFileUrl && (
+                  <a
+                    href={localFileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="sm:hidden px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold"
+                  >
+                    Open Tab
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-sm"
+                >
+                  Close Preview
+                </button>
+              </div>
             </div>
           </div>
         </div>
