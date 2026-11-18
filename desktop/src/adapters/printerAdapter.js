@@ -1,6 +1,49 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execFileSync } = require('child_process');
+
+function convertImageToGrayscale(imagePath) {
+  try {
+    const fullPath = path.resolve(imagePath);
+    const escaped = fullPath.replace(/'/g, "''");
+    const script = [
+      'Add-Type -AssemblyName System.Drawing',
+      `$p = '${escaped}'`,
+      '$img = [System.Drawing.Image]::FromFile($p)',
+      '$bmp = New-Object System.Drawing.Bitmap($img.Width, $img.Height)',
+      '$g = [System.Drawing.Graphics]::FromImage($bmp)',
+      '$cm = New-Object System.Drawing.Imaging.ColorMatrix',
+      '$cm.Matrix00 = 0.299; $cm.Matrix01 = 0.299; $cm.Matrix02 = 0.299',
+      '$cm.Matrix10 = 0.587; $cm.Matrix11 = 0.587; $cm.Matrix12 = 0.587',
+      '$cm.Matrix20 = 0.114; $cm.Matrix21 = 0.114; $cm.Matrix22 = 0.114',
+      '$cm.Matrix33 = 1.0;   $cm.Matrix44 = 1.0',
+      '$ia = New-Object System.Drawing.Imaging.ImageAttributes',
+      '$ia.SetColorMatrix($cm)',
+      '$rect = New-Object System.Drawing.Rectangle(0, 0, $img.Width, $img.Height)',
+      '$g.DrawImage($img, $rect, 0, 0, $img.Width, $img.Height, [System.Drawing.GraphicsUnit]::Pixel, $ia)',
+      '$g.Dispose()',
+      '$img.Dispose()',
+      '$ext = [System.IO.Path]::GetExtension($p).ToLower()',
+      '$fmt = [System.Drawing.Imaging.ImageFormat]::Jpeg',
+      'if ($ext -eq ".png") { $fmt = [System.Drawing.Imaging.ImageFormat]::Png }',
+      'elseif ($ext -eq ".bmp") { $fmt = [System.Drawing.Imaging.ImageFormat]::Bmp }',
+      '$bmp.Save($p, $fmt)',
+      '$bmp.Dispose()'
+    ].join('\r\n');
+
+    const encoded = Buffer.from(script, 'utf16le').toString('base64');
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+      windowsHide: true,
+      timeout: 10000
+    });
+    console.log(`[PrinterAdapter] Successfully converted image to Black & White: ${imagePath}`);
+    return true;
+  } catch (err) {
+    console.warn('[PrinterAdapter] Grayscale conversion warning:', err.message);
+    return false;
+  }
+}
 
 class BasePrinterAdapter {
   async getPrinters() {
@@ -75,6 +118,14 @@ class WindowsPrinterAdapter extends BasePrinterAdapter {
       // Copy file before temp folder shredding
       fs.copyFileSync(filePath, destPath);
       console.log(`[PrinterAdapter] Successfully saved print output to: ${destPath}`);
+
+      // Apply Black & White / Grayscale conversion if requested
+      const printMode = (options.options?.print_mode || options.options?.color_mode || '').toLowerCase();
+      const isBw = (printMode === 'bw' || printMode === 'monochrome' || printMode === 'grayscale');
+
+      if (isBw && /\.(jpg|jpeg|png|bmp)$/i.test(destPath)) {
+        convertImageToGrayscale(destPath);
+      }
 
       return {
         success: true,
