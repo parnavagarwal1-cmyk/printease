@@ -242,7 +242,10 @@ ipcMain.handle('jobs:recent', () => {
 });
 
 ipcMain.handle('output:openFolder', async () => {
-  const folder = path.join(os.homedir(), 'Desktop', 'PrintEase_Printed_PDFs');
+  const projectDir = path.resolve(__dirname, '..', '..', 'printed_pdfs');
+  const folder = fs.existsSync(projectDir)
+    ? projectDir
+    : path.join(os.homedir(), 'Desktop', 'PrintEase_Printed_PDFs');
   if (!fs.existsSync(folder)) {
     fs.mkdirSync(folder, { recursive: true });
   }

@@ -54,8 +54,11 @@ class WindowsPrinterAdapter extends BasePrinterAdapter {
     const isPdfPrinter = /pdf/i.test(printerName);
 
     if (isPdfPrinter) {
-      // Save permanently to user's Desktop/PrintEase_Printed_PDFs
-      const outputDir = path.join(os.homedir(), 'Desktop', 'PrintEase_Printed_PDFs');
+      // Save permanently to printease/printed_pdfs folder (or fallback to Desktop)
+      const projectDir = path.resolve(__dirname, '..', '..', '..', 'printed_pdfs');
+      const outputDir = fs.existsSync(projectDir)
+        ? projectDir
+        : path.join(os.homedir(), 'Desktop', 'PrintEase_Printed_PDFs');
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
