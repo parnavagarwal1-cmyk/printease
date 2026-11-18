@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { WindowsPrinterAdapter } = require('./adapters/printerAdapter');
 const { PrintWorker } = require('./worker/printWorker');
 
@@ -238,4 +239,13 @@ ipcMain.handle('jobs:pollNow', async () => {
 
 ipcMain.handle('jobs:recent', () => {
   return recentJobs;
+});
+
+ipcMain.handle('output:openFolder', async () => {
+  const folder = path.join(os.homedir(), 'Desktop', 'PrintEase_Printed_PDFs');
+  if (!fs.existsSync(folder)) {
+    fs.mkdirSync(folder, { recursive: true });
+  }
+  await shell.openPath(folder);
+  return { success: true, folder };
 });

@@ -39,6 +39,13 @@ function setupTabs() {
 }
 
 function setupEventListeners() {
+  const btnOpenFolder = document.getElementById('btn-open-folder');
+  if (btnOpenFolder) {
+    btnOpenFolder.addEventListener('click', async () => {
+      await window.electronAPI.openOutputFolder();
+    });
+  }
+
   document.getElementById('btn-refresh').addEventListener('click', async () => {
     await refreshBackendStatus();
     await scanPrinters();
@@ -198,13 +205,17 @@ async function scanPrinters() {
 
     const banner = document.getElementById('selected-printer-banner');
     if (banner) {
+      const isPdf = /pdf/i.test(activePrinterName);
       banner.style.display = 'flex';
       banner.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:15px;">🖨️</span>
           <span>Active Spooler Hardware: <strong style="color:#1E1B4B; font-weight:700;">${escapeHtml(activePrinterName)}</strong></span>
         </div>
-        <span class="badge badge-success" style="font-size:11px; padding:3px 10px;">Ready for Auto-Spooling</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${isPdf ? '<button class="btn btn-secondary btn-sm" onclick="openPdfFolder()" style="font-size:11px; padding:3px 10px; cursor:pointer;">📁 Open Output Folder</button>' : ''}
+          <span class="badge badge-success" style="font-size:11px; padding:3px 10px;">Ready for Auto-Spooling</span>
+        </div>
       `;
     }
 
@@ -294,6 +305,12 @@ function createJobElement(job) {
 
   return div;
 }
+
+window.openPdfFolder = async function() {
+  if (window.electronAPI && window.electronAPI.openOutputFolder) {
+    await window.electronAPI.openOutputFolder();
+  }
+};
 
 window.selectPrinter = async function(printerName) {
   try {

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pairDevice: (pairingCode) => ipcRenderer.invoke('device:pair', pairingCode),
   pollNow: () => ipcRenderer.invoke('jobs:pollNow'),
   getRecentJobs: () => ipcRenderer.invoke('jobs:recent'),
+  openOutputFolder: () => ipcRenderer.invoke('output:openFolder'),
   onJobStatusUpdate: (callback) => {
     const handler = (event, data) => callback(data);
     ipcRenderer.on('job:status-update', handler);

@@ -191,7 +191,9 @@ class PrintWorker {
       
       const spoolResult = await this.printerAdapter.printJob(tempFilePath, {
         printerName,
-        options: job.options
+        options: job.options,
+        orderNumber: job.order_number,
+        originalFilename: job.file?.original_filename || job.file?.original_name
       });
 
       const spoolDuration = Date.now() - startTime;
@@ -212,19 +214,25 @@ class PrintWorker {
             spool_duration_ms: spoolDuration,
             printer_used: printerName,
             pages_printed: job.file?.page_count || 1,
-            sheets: job.options?.sheet_count || 1
+            sheets: job.options?.sheet_count || 1,
+            saved_path: spoolResult.savedPath || null
           }
         })
       });
 
       console.log(`[PrintWorker] Job #${job.id} successfully completed and spooled!`);
 
+      const completionMessage = spoolResult.savedPath
+        ? `PDF saved to Desktop/PrintEase_Printed_PDFs (${path.basename(spoolResult.savedPath)})`
+        : `Print complete! Sent to ${printerName}`;
+
       this.onEvent('job:status-update', {
         jobId: job.id,
         orderNumber: job.order_number,
         status: 'COMPLETED',
-        message: `Print complete! Sent to ${printerName}`,
-        spoolerJobId: spoolResult.jobId
+        message: completionMessage,
+        spoolerJobId: spoolResult.jobId,
+        savedPath: spoolResult.savedPath
       });
     } catch (err) {
       console.error(`[PrintWorker] Failed processing Job #${job.id}:`, err);
