@@ -54,24 +54,27 @@ class WindowsPrinterAdapter extends BasePrinterAdapter {
     const isPdfPrinter = /pdf/i.test(printerName);
 
     if (isPdfPrinter) {
-      // Save permanently to printease/printed_pdfs folder (or fallback to Desktop)
-      const projectDir = path.resolve(__dirname, '..', '..', '..', 'printed_pdfs');
-      const outputDir = fs.existsSync(projectDir)
-        ? projectDir
-        : path.join(os.homedir(), 'Desktop', 'PrintEase_Printed_PDFs');
+      // Save permanently to printease/printed_pdfs folder on Desktop (or fallback to Desktop/PrintEase_Printed_PDFs)
+      const desktopDir = path.join(os.homedir(), 'Desktop');
+      const printeaseProjectDir = path.join(desktopDir, 'printease', 'printed_pdfs');
+      const outputDir = fs.existsSync(printeaseProjectDir)
+        ? printeaseProjectDir
+        : path.join(desktopDir, 'PrintEase_Printed_PDFs');
+
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
       const orderTag = options.orderNumber ? `Order_${options.orderNumber}` : `Job_${Date.now()}`;
       const rawFilename = options.originalFilename || path.basename(filePath);
-      const cleanFilename = rawFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const finalFilename = `${orderTag}_${cleanFilename.toLowerCase().endsWith('.pdf') ? cleanFilename : cleanFilename + '.pdf'}`;
+      const ext = path.extname(rawFilename) || path.extname(filePath) || '.pdf';
+      const baseName = path.basename(rawFilename, ext).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const finalFilename = `${orderTag}_${baseName}${ext}`;
       const destPath = path.join(outputDir, finalFilename);
 
       // Copy file before temp folder shredding
       fs.copyFileSync(filePath, destPath);
-      console.log(`[PrinterAdapter] Successfully saved PDF output to: ${destPath}`);
+      console.log(`[PrinterAdapter] Successfully saved print output to: ${destPath}`);
 
       return {
         success: true,
