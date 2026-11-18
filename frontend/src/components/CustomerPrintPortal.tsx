@@ -391,7 +391,27 @@ export const CustomerPrintPortal: React.FC<Props> = ({
       }
 
       if (isMock) {
-        throw new Error('Razorpay gateway is not configured with active merchant credentials in shop settings yet. Please ask the shopkeeper to configure Razorpay API keys.');
+        // Sandbox / Demo mode: Simulate immediate payment verification
+        const mockPayId = `pay_mock_${Date.now()}`;
+        const verifyRes = await fetch(`/api/public/orders/${encodeURIComponent(createdOrder.order_number)}/verify-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_order_id: rzpOrderId,
+            razorpay_payment_id: mockPayId,
+            razorpay_signature: 'mock_test_signature',
+          }),
+        });
+
+        if (!verifyRes.ok) {
+          const vErr = await verifyRes.json().catch(() => ({}));
+          throw new Error(vErr.message || 'Payment verification rejected.');
+        }
+
+        const vData = await verifyRes.json();
+        setPaymentSuccess(true);
+        setCreatedOrder(vData.order);
+        return;
       }
 
       throw new Error('Online payment is currently unavailable. Please ask the shopkeeper to configure Razorpay keys.');
