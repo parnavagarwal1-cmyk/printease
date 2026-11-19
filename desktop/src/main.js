@@ -1,11 +1,48 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { WindowsPrinterAdapter } = require('./adapters/printerAdapter');
 const { PrintWorker } = require('./worker/printWorker');
 
+function getLogFilePath() {
+  try {
+    return path.join(app.getPath('userData'), 'agent.log');
+  } catch {
+    return path.join(os.homedir(), 'AppData', 'Roaming', 'printease-desktop', 'agent.log');
+  }
+}
+
+function logToFile(msg, err = null) {
+  try {
+    const logPath = getLogFilePath();
+    const dir = path.dirname(logPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const timestamp = new Date().toISOString();
+    const errText = err ? (err.stack || err.message || JSON.stringify(err)) : '';
+    const line = `[${timestamp}] ${msg} ${errText}\n`;
+    fs.appendFileSync(logPath, line, 'utf8');
+    console.log(msg, errText);
+  } catch (e) {
+    console.error('Failed to write log:', e);
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  logToFile('[FATAL] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logToFile('[FATAL] Unhandled Rejection:', reason);
+});
+
+process.on('exit', (code) => {
+  logToFile(`[PROCESS] process.on(exit) with code: ${code}`);
+});
+
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
 let printerAdapter = null;
 let printWorker = null;
 const recentJobs = [];
@@ -58,12 +95,16 @@ function savePersistedConfig(cfg) {
 }
 
 function createWindow() {
+  logToFile('[APP] createWindow() called.');
+  const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+
   mainWindow = new BrowserWindow({
     width: 1020,
     height: 720,
     minWidth: 800,
     minHeight: 560,
     title: 'PrintEase Desktop Agent',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     backgroundColor: '#F8FAFC',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -93,32 +134,138 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    logToFile(`[RENDERER] Render process gone: ${JSON.stringify(details)}`);
+  });
+
+  mainWindow.webContents.on('unresponsive', () => {
+    logToFile('[RENDERER] Window became unresponsive.');
+  });
+
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      logToFile('[WINDOW] Window close intercepted -> minimized to background/tray.');
+      return false;
+    }
+    logToFile('[WINDOW] Window closed cleanly because isQuitting = true.');
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
+    logToFile('[WINDOW] mainWindow destroyed.');
   });
 
   // Start polling worker if already paired
   if (deviceConfig.paired && deviceConfig.deviceToken) {
+    logToFile('[APP] Starting background printWorker loop...');
     printWorker.start(deviceConfig.pollIntervalMs);
   }
 }
 
-app.whenReady().then(() => {
-  loadPersistedConfig();
-  createWindow();
+function createTray() {
+  try {
+    const icoPath = path.join(__dirname, 'assets', 'icon.ico');
+    const pngPath = path.join(__dirname, 'assets', 'icon.png');
+    const trayIconPath = fs.existsSync(icoPath) ? icoPath : pngPath;
+    
+    tray = new Tray(trayIconPath);
+    tray.setToolTip('PrintEase Desktop Agent - Active & Polling');
+    
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Open PrintEase Agent',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        }
+      },
+      {
+        label: 'Open Printed Files Folder',
+        click: async () => {
+          const desktopDir = path.join(os.homedir(), 'Desktop');
+          const printeaseProjectDir = path.join(desktopDir, 'printease', 'printed_pdfs');
+          const folder = fs.existsSync(printeaseProjectDir) ? printeaseProjectDir : path.join(desktopDir, 'PrintEase_Printed_PDFs');
+          if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+          await shell.openPath(folder);
+        }
+      },
+      { type: 'separator' },
+      {
+        label: 'Exit PrintEase Completely',
+        click: () => {
+          logToFile('[TRAY] User clicked Exit PrintEase.');
+          isQuitting = true;
+          if (printWorker) printWorker.stop();
+          app.quit();
+        }
+      }
+    ]);
+    
+    tray.setContextMenu(contextMenu);
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+    logToFile('[TRAY] System tray initialized successfully with icon.');
+  } catch (err) {
+    logToFile('[TRAY] Failed to create system tray:', err);
+  }
+}
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+// Single Instance Lock
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  logToFile('[APP] Another instance is already running. Quitting secondary process.');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    logToFile('[APP] Second instance detected. Restoring main window.');
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
     }
   });
+
+  app.whenReady().then(() => {
+    logToFile('[APP] app.whenReady fired.');
+    loadPersistedConfig();
+    createWindow();
+    createTray();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      } else if (mainWindow) {
+        mainWindow.show();
+      }
+    });
+  });
+}
+
+app.on('before-quit', () => {
+  logToFile('[APP] before-quit event fired.');
+  isQuitting = true;
+});
+
+app.on('will-quit', () => {
+  logToFile('[APP] will-quit event fired.');
+});
+
+app.on('quit', (event, exitCode) => {
+  logToFile(`[APP] quit event fired with exit code ${exitCode}.`);
 });
 
 app.on('window-all-closed', () => {
-  if (printWorker) {
-    printWorker.stop();
-  }
-  if (process.platform !== 'darwin') {
+  logToFile('[APP] window-all-closed fired.');
+  if (process.platform !== 'darwin' && isQuitting) {
+    if (printWorker) printWorker.stop();
     app.quit();
   }
 });
