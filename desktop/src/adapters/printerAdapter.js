@@ -45,6 +45,105 @@ function convertImageToGrayscale(imagePath) {
   }
 }
 
+function getSumatraExecutable() {
+  const possiblePaths = [
+    // 1. Production unpacked path (electron-builder asarUnpack)
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'src', 'bin', 'SumatraPDF.exe'),
+    // 2. Production unpacked path alternative
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'bin', 'SumatraPDF.exe'),
+    // 3. Local source tree bin
+    path.join(__dirname, '..', 'bin', 'SumatraPDF.exe'),
+    // 4. node_modules pdf-to-printer
+    path.join(__dirname, '..', '..', 'node_modules', 'pdf-to-printer', 'dist', 'SumatraPDF-3.4.6-32.exe'),
+    // 5. Persistent AppData folder
+    path.join(os.homedir(), 'AppData', 'Roaming', 'printease-desktop', 'bin', 'SumatraPDF.exe')
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+
+  // Fallback: extract from bundle to AppData if running inside asar
+  const targetPath = path.join(os.homedir(), 'AppData', 'Roaming', 'printease-desktop', 'bin', 'SumatraPDF.exe');
+  try {
+    const dir = path.dirname(targetPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const bundled = path.join(__dirname, '..', 'bin', 'SumatraPDF.exe');
+    if (fs.existsSync(bundled)) {
+      fs.writeFileSync(targetPath, fs.readFileSync(bundled));
+      return targetPath;
+    }
+  } catch (err) {
+    console.warn('[PrinterAdapter] Failed to extract bundled SumatraPDF:', err.message);
+  }
+
+  return targetPath;
+}
+
+function printToPhysicalPrinter(filePath, printerName, options = {}) {
+  const sumatraExe = getSumatraExecutable();
+  console.log(`[PrinterAdapter] Using SumatraPDF engine: ${sumatraExe}`);
+  
+  if (!fs.existsSync(sumatraExe)) {
+    throw new Error(`Print engine executable not found on system: ${sumatraExe}`);
+  }
+
+  const printMode = (options.options?.print_mode || options.options?.color_mode || '').toLowerCase();
+  const isBw = (printMode === 'bw' || printMode === 'monochrome' || printMode === 'grayscale');
+  const copies = parseInt(options.options?.copies || options.copies || 1, 10);
+  const paperSize = options.options?.paper_size || 'A4';
+  const orientation = (options.options?.orientation || 'portrait').toLowerCase();
+
+  const args = [
+    '-print-to', printerName,
+    '-silent'
+  ];
+
+  const settings = [];
+  if (copies > 1) settings.push(`${copies}x`);
+  if (isBw) settings.push('monochrome');
+  else settings.push('color');
+  settings.push('fit');
+  if (paperSize) settings.push(`paper=${paperSize}`);
+  if (orientation === 'landscape') settings.push('landscape');
+
+  if (settings.length > 0) {
+    args.push('-print-settings', settings.join(','));
+  }
+
+  args.push(filePath);
+
+  console.log(`[PrinterAdapter] Spooling to hardware printer "${printerName}" with args: ${args.join(' ')}`);
+
+  try {
+    execFileSync(sumatraExe, args, {
+      windowsHide: true,
+      timeout: 60000
+    });
+    console.log(`[PrinterAdapter] ✓ Print job successfully spooled to "${printerName}"!`);
+    return { success: true };
+  } catch (err) {
+    console.error(`[PrinterAdapter] Primary print spooling failed:`, err.message);
+
+    // Fallback: PowerShell PrintTo verb
+    console.log(`[PrinterAdapter] Attempting fallback via PowerShell PrintTo verb...`);
+    const escapedFile = filePath.replace(/'/g, "''");
+    const escapedPrinter = printerName.replace(/'/g, "''");
+    const psScript = `Start-Process -FilePath '${escapedFile}' -Verb PrintTo -ArgumentList '"${escapedPrinter}"' -PassThru | Wait-Process -Timeout 20`;
+    const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
+    
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+      windowsHide: true,
+      timeout: 25000
+    });
+
+    console.log(`[PrinterAdapter] ✓ Fallback print job dispatched to "${printerName}"!`);
+    return { success: true, method: 'powershell-verb' };
+  }
+}
+
 class BasePrinterAdapter {
   async getPrinters() {
     throw new Error('getPrinters() must be implemented by adapter');
@@ -96,37 +195,38 @@ class WindowsPrinterAdapter extends BasePrinterAdapter {
     // Detect if virtual PDF printer (e.g., 'Microsoft Print to PDF') is active
     const isPdfPrinter = /pdf/i.test(printerName);
 
+    // 1. Always save a permanent backup copy in printease/printed_pdfs
+    const desktopDir = path.join(os.homedir(), 'Desktop');
+    const printeaseProjectDir = path.join(desktopDir, 'printease', 'printed_pdfs');
+    const outputDir = fs.existsSync(printeaseProjectDir)
+      ? printeaseProjectDir
+      : path.join(desktopDir, 'PrintEase_Printed_PDFs');
+
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const orderTag = options.orderNumber ? `Order_${options.orderNumber}` : `Job_${Date.now()}`;
+    const rawFilename = options.originalFilename || path.basename(filePath);
+    const ext = path.extname(rawFilename) || path.extname(filePath) || '.pdf';
+    const baseName = path.basename(rawFilename, ext).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const finalFilename = `${orderTag}_${baseName}${ext}`;
+    const destPath = path.join(outputDir, finalFilename);
+
+    // Copy file before temp folder shredding
+    fs.copyFileSync(filePath, destPath);
+    console.log(`[PrinterAdapter] Permanent copy stored at: ${destPath}`);
+
+    // Apply Black & White / Grayscale conversion if requested
+    const printMode = (options.options?.print_mode || options.options?.color_mode || '').toLowerCase();
+    const isBw = (printMode === 'bw' || printMode === 'monochrome' || printMode === 'grayscale');
+
+    if (isBw && /\.(jpg|jpeg|png|bmp)$/i.test(destPath)) {
+      convertImageToGrayscale(destPath);
+    }
+
     if (isPdfPrinter) {
-      // Save permanently to printease/printed_pdfs folder on Desktop (or fallback to Desktop/PrintEase_Printed_PDFs)
-      const desktopDir = path.join(os.homedir(), 'Desktop');
-      const printeaseProjectDir = path.join(desktopDir, 'printease', 'printed_pdfs');
-      const outputDir = fs.existsSync(printeaseProjectDir)
-        ? printeaseProjectDir
-        : path.join(desktopDir, 'PrintEase_Printed_PDFs');
-
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      const orderTag = options.orderNumber ? `Order_${options.orderNumber}` : `Job_${Date.now()}`;
-      const rawFilename = options.originalFilename || path.basename(filePath);
-      const ext = path.extname(rawFilename) || path.extname(filePath) || '.pdf';
-      const baseName = path.basename(rawFilename, ext).replace(/[^a-zA-Z0-9._-]/g, '_');
-      const finalFilename = `${orderTag}_${baseName}${ext}`;
-      const destPath = path.join(outputDir, finalFilename);
-
-      // Copy file before temp folder shredding
-      fs.copyFileSync(filePath, destPath);
-      console.log(`[PrinterAdapter] Successfully saved print output to: ${destPath}`);
-
-      // Apply Black & White / Grayscale conversion if requested
-      const printMode = (options.options?.print_mode || options.options?.color_mode || '').toLowerCase();
-      const isBw = (printMode === 'bw' || printMode === 'monochrome' || printMode === 'grayscale');
-
-      if (isBw && /\.(jpg|jpeg|png|bmp)$/i.test(destPath)) {
-        convertImageToGrayscale(destPath);
-      }
-
+      console.log(`[PrinterAdapter] Virtual PDF printer detected. Document preserved in output folder.`);
       return {
         success: true,
         jobId: `pdf-save-${Date.now()}`,
@@ -135,11 +235,17 @@ class WindowsPrinterAdapter extends BasePrinterAdapter {
       };
     }
 
-    // Physical hardware printer spooling
+    // 2. Real Physical hardware printer spooling
+    console.log(`[PrinterAdapter] Sending document to physical printer: "${printerName}"...`);
+    const printResult = printToPhysicalPrinter(destPath, printerName, options);
+
     return {
       success: true,
       jobId: `spool-${Date.now()}`,
-      status: 'SUBMITTED_TO_SPOOLER'
+      status: 'PRINTED_TO_HARDWARE',
+      printer: printerName,
+      method: printResult.method || 'sumatrapdf',
+      savedPath: destPath
     };
   }
 

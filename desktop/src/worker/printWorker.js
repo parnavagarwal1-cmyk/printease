@@ -222,9 +222,12 @@ class PrintWorker {
 
       console.log(`[PrintWorker] Job #${job.id} successfully completed and spooled!`);
 
-      const completionMessage = spoolResult.savedPath
-        ? `PDF saved to Desktop/PrintEase_Printed_PDFs (${path.basename(spoolResult.savedPath)})`
-        : `Print complete! Sent to ${printerName}`;
+      let completionMessage = `Print complete! Sent to ${printerName}`;
+      if (spoolResult.status === 'PRINTED_TO_HARDWARE') {
+        completionMessage = `✓ Sent to physical printer: ${printerName} (Backup saved in printed_pdfs)`;
+      } else if (spoolResult.status === 'SAVED_TO_DESKTOP') {
+        completionMessage = `✓ Saved to printease/printed_pdfs (${path.basename(spoolResult.savedPath)})`;
+      }
 
       this.onEvent('job:status-update', {
         jobId: job.id,

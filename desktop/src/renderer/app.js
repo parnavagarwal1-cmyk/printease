@@ -207,14 +207,26 @@ async function scanPrinters() {
     if (banner) {
       const isPdf = /pdf/i.test(activePrinterName);
       banner.style.display = 'flex';
+      banner.style.flexDirection = 'column';
+      banner.style.gap = '6px';
       banner.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:15px;">🖨️</span>
-          <span>Active Spooler Hardware: <strong style="color:#1E1B4B; font-weight:700;">${escapeHtml(activePrinterName)}</strong></span>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:16px;">${isPdf ? '📄' : '🖨️'}</span>
+            <span>Target Printer: <strong style="color:#1E1B4B; font-weight:700;">${escapeHtml(activePrinterName)}</strong></span>
+            <span class="badge ${isPdf ? 'badge-primary' : 'badge-success'}" style="font-size:10px; padding:2px 8px;">
+              ${isPdf ? 'Virtual Mode (Save to Folder)' : 'Physical Hardware (Real Paper)'}
+            </span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="openPdfFolder()" style="font-size:11px; padding:3px 10px; cursor:pointer;">📁 Open printed_pdfs Folder</button>
+            <span class="badge badge-success" style="font-size:11px; padding:3px 10px;">Ready for Auto-Spooling</span>
+          </div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px;">
-          ${isPdf ? '<button class="btn btn-secondary btn-sm" onclick="openPdfFolder()" style="font-size:11px; padding:3px 10px; cursor:pointer;">📁 Open Output Folder</button>' : ''}
-          <span class="badge badge-success" style="font-size:11px; padding:3px 10px;">Ready for Auto-Spooling</span>
+        <div style="font-size:11px; color:${isPdf ? '#64748B' : '#047857'}; margin-left:24px;">
+          ${isPdf 
+            ? 'ℹ️ Virtual PDF printer selected. Orders are saved into printease/printed_pdfs. To print directly onto physical paper, click "Select" on your physical printer below.' 
+            : '✓ Physical printing active! Incoming print jobs will automatically feed and print on real paper.'}
         </div>
       `;
     }

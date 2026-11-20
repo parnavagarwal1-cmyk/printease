@@ -22,6 +22,9 @@
       "src/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "src/bin/**/*"
+    ],
     "win": {
       "target": [
         {
@@ -45,5 +48,8 @@
   "devDependencies": {
     "electron": "^33.2.1",
     "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "pdf-to-printer": "^5.8.1"
   }
 }
