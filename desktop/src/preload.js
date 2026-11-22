@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pollNow: () => ipcRenderer.invoke('jobs:pollNow'),
   getRecentJobs: () => ipcRenderer.invoke('jobs:recent'),
   openOutputFolder: () => ipcRenderer.invoke('output:openFolder'),
+  testPrint: (printerName) => ipcRenderer.invoke('printers:testPrint', printerName),
+  openLogs: () => ipcRenderer.invoke('logs:open'),
   onJobStatusUpdate: (callback) => {
     const handler = (event, data) => callback(data);
     ipcRenderer.on('job:status-update', handler);

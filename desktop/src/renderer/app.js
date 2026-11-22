@@ -52,6 +52,15 @@ function setupEventListeners() {
     await loadRecentJobs();
   });
 
+  const btnLogs = document.getElementById('btn-view-logs');
+  if (btnLogs) {
+    btnLogs.addEventListener('click', async () => {
+      if (window.electronAPI && window.electronAPI.openLogs) {
+        await window.electronAPI.openLogs();
+      }
+    });
+  }
+
   const btnPoll = document.getElementById('btn-poll-now');
   if (btnPoll) {
     btnPoll.addEventListener('click', async () => {
@@ -205,12 +214,12 @@ async function scanPrinters() {
 
     const banner = document.getElementById('selected-printer-banner');
     if (banner) {
-      const isPdf = /pdf/i.test(activePrinterName);
+      const isPdf = Boolean(activePrinterName && /pdf/i.test(activePrinterName));
       banner.style.display = 'flex';
       banner.style.flexDirection = 'column';
-      banner.style.gap = '6px';
+      banner.style.gap = '8px';
       banner.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:16px;">${isPdf ? '📄' : '🖨️'}</span>
             <span>Target Printer: <strong style="color:#1E1B4B; font-weight:700;">${escapeHtml(activePrinterName)}</strong></span>
@@ -219,11 +228,15 @@ async function scanPrinters() {
             </span>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            <button class="btn btn-secondary btn-sm" onclick="openPdfFolder()" style="font-size:11px; padding:3px 10px; cursor:pointer;">📁 Open printed_pdfs Folder</button>
-            <span class="badge badge-success" style="font-size:11px; padding:3px 10px;">Ready for Auto-Spooling</span>
+            <button class="btn btn-primary btn-sm" onclick="testPrintPrinter('${escapeHtml(activePrinterName)}')" style="font-size:11px; padding:4px 12px; cursor:pointer;">
+              🖨️ Print Hardware Test Page
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="openPdfFolder()" style="font-size:11px; padding:4px 10px; cursor:pointer;">
+              📁 Open printed_pdfs
+            </button>
           </div>
         </div>
-        <div style="font-size:11px; color:${isPdf ? '#64748B' : '#047857'}; margin-left:24px;">
+        <div style="font-size:11px; color:${isPdf ? '#64748B' : '#047857'}; margin-left:4px;">
           ${isPdf 
             ? 'ℹ️ Virtual PDF printer selected. Orders are saved into printease/printed_pdfs. To print directly onto physical paper, click "Select" on your physical printer below.' 
             : '✓ Physical printing active! Incoming print jobs will automatically feed and print on real paper.'}
@@ -234,21 +247,30 @@ async function scanPrinters() {
     container.innerHTML = '';
     printers.forEach(printer => {
       const isSelected = (currentSelected ? currentSelected === printer.name : Boolean(printer.isDefault));
+      const isVirtual = printer.isVirtual || /pdf|onenote|xps|fax|writer/i.test(printer.name);
+
       const card = document.createElement('div');
       card.className = `printer-card ${isSelected ? 'selected' : ''}`;
       card.innerHTML = `
         <div>
-          <div class="printer-info-name" style="display:flex; align-items:center; gap:6px;">
+          <div class="printer-info-name" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             <span style="font-weight:700; color:${isSelected ? '#1E1B4B' : '#0F172A'};">${escapeHtml(printer.name)}</span>
-            ${printer.isDefault ? '<span class="badge badge-success" style="font-size:10px;">Default</span>' : ''}
+            ${isVirtual 
+              ? '<span class="badge" style="background:#F1F5F9; color:#475569; font-size:10px;">📄 Virtual / PDF</span>' 
+              : '<span class="badge" style="background:#ECFDF5; color:#047857; font-weight:700; font-size:10px;">🖨️ Physical Paper</span>'
+            }
+            ${printer.isDefault ? '<span class="badge badge-success" style="font-size:10px;">Windows Default</span>' : ''}
             ${isSelected ? '<span class="badge badge-primary" style="font-size:10px; font-weight:700;">✓ Active Spooler</span>' : ''}
           </div>
           <div class="printer-info-detail">${escapeHtml(printer.displayName || printer.description || 'System Printer')}</div>
         </div>
-        <div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="btn btn-secondary btn-sm" style="cursor:pointer; padding:6px 12px; border-radius:6px; font-size:11px;" onclick="testPrintPrinter('${escapeHtml(printer.name)}')">
+            🖨️ Test Print
+          </button>
           ${isSelected 
             ? '<button class="btn btn-sm" style="background:#10B981; color:white; border:none; cursor:default; font-weight:600; padding:6px 14px; border-radius:6px;" disabled>✓ Selected</button>'
-            : `<button class="btn btn-secondary btn-sm" style="cursor:pointer; padding:6px 14px; border-radius:6px;" onclick="selectPrinter('${escapeHtml(printer.name)}')">Select</button>`
+            : `<button class="btn btn-primary btn-sm" style="cursor:pointer; padding:6px 14px; border-radius:6px;" onclick="selectPrinter('${escapeHtml(printer.name)}')">Select</button>`
           }
         </div>
       `;
@@ -338,6 +360,43 @@ window.selectPrinter = async function(printerName) {
   } catch (err) {
     console.error('Failed to select printer:', err);
     alert('Failed to select printer: ' + err.message);
+  }
+};
+
+window.testPrintPrinter = async function(printerName) {
+  const fb = document.getElementById('test-print-feedback');
+  if (fb) {
+    fb.style.display = 'block';
+    fb.style.background = '#EFF6FF';
+    fb.style.border = '1px solid #BFDBFE';
+    fb.style.color = '#1D4ED8';
+    fb.innerHTML = `<span>⏳ Sending hardware test page to <strong>${escapeHtml(printerName)}</strong>...</span>`;
+  }
+
+  try {
+    const res = await window.electronAPI.testPrint(printerName);
+    if (res && res.success) {
+      if (fb) {
+        fb.style.background = '#ECFDF5';
+        fb.style.border = '1px solid #A7F3D0';
+        fb.style.color = '#065F46';
+        fb.innerHTML = `<span>${escapeHtml(res.message)}</span>`;
+      }
+    } else {
+      if (fb) {
+        fb.style.background = '#FEF2F2';
+        fb.style.border = '1px solid #FECACA';
+        fb.style.color = '#991B1B';
+        fb.innerHTML = `<span>✗ Test print failed: ${escapeHtml(res ? res.message : 'Unknown error')}</span>`;
+      }
+    }
+  } catch (err) {
+    if (fb) {
+      fb.style.background = '#FEF2F2';
+      fb.style.border = '1px solid #FECACA';
+      fb.style.color = '#991B1B';
+      fb.innerHTML = `<span>✗ Error: ${escapeHtml(err.message)}</span>`;
+    }
   }
 };
 

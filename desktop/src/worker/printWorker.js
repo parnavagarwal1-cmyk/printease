@@ -80,6 +80,9 @@ class PrintWorker {
     });
 
     if (!pollRes.ok) {
+      if (pollRes.status === 401) {
+        console.warn(`[PrintWorker] Polling unauthorized (401). Device token may have expired.`);
+      }
       return;
     }
 

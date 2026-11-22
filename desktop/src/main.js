@@ -121,6 +121,7 @@ function createWindow() {
     getConfig: () => deviceConfig,
     printerAdapter,
     onEvent: (event, data) => {
+      logToFile(`[WORKER_EVENT] ${event}: ${JSON.stringify(data)}`);
       if (event === 'job:status-update') {
         const entry = { ...data, timestamp: new Date().toISOString() };
         recentJobs.unshift(entry);
@@ -399,4 +400,64 @@ ipcMain.handle('output:openFolder', async () => {
   }
   await shell.openPath(folder);
   return { success: true, folder };
+});
+
+ipcMain.handle('logs:open', async () => {
+  const logFile = getLogFilePath();
+  if (fs.existsSync(logFile)) {
+    await shell.openPath(logFile);
+    return { success: true, logFile };
+  }
+  return { success: false, message: 'Log file not found yet.' };
+});
+
+ipcMain.handle('printers:testPrint', async (event, printerName) => {
+  logToFile(`[IPC] Received test print request for printer: "${printerName}"`);
+  if (!printerAdapter) {
+    return { success: false, message: 'Printer adapter not ready' };
+  }
+
+  try {
+    const targetPrinter = printerName || deviceConfig.selectedPrinter;
+    logToFile(`[IPC] Generating test page for: "${targetPrinter}"...`);
+    const testPagePath = printerAdapter.generateTestPage(targetPrinter);
+
+    if (!testPagePath || !fs.existsSync(testPagePath)) {
+      throw new Error('Failed to generate test page bitmap');
+    }
+
+    logToFile(`[IPC] Sending test document: ${testPagePath} to: "${targetPrinter}"...`);
+    const res = await printerAdapter.printJob(testPagePath, {
+      printerName: targetPrinter,
+      orderNumber: 'TEST-PAGE',
+      options: {
+        print_mode: 'color',
+        copies: 1,
+        paper_size: 'A4'
+      }
+    });
+
+    logToFile(`[IPC] Test print response: ${JSON.stringify(res)}`);
+
+    // Clean up temporary generated file after spooling
+    setTimeout(() => {
+      try {
+        if (fs.existsSync(testPagePath)) fs.unlinkSync(testPagePath);
+      } catch {}
+    }, 5000);
+
+    return {
+      success: true,
+      message: res.status === 'SAVED_TO_DESKTOP'
+        ? `✓ Test page saved to printease/printed_pdfs (${path.basename(res.savedPath)})`
+        : `✓ Hardware print sent to "${res.printer}" via ${res.method}! Check your printer output tray.`,
+      result: res
+    };
+  } catch (err) {
+    logToFile(`[IPC] Test print failed:`, err);
+    return {
+      success: false,
+      message: err.message || 'Test print failed'
+    };
+  }
 });

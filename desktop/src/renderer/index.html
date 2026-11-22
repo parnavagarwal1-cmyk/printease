@@ -94,6 +94,9 @@
           <button class="btn btn-secondary" id="btn-refresh">
             <span>Refresh</span>
           </button>
+          <button class="btn btn-secondary" id="btn-view-logs" title="Open Agent Log File">
+            <span>📋 Logs</span>
+          </button>
         </div>
       </header>
 
@@ -200,6 +203,7 @@
               <button class="btn btn-primary" id="btn-rescan-printers">Scan Printers</button>
             </div>
             <div class="card-body">
+              <div id="test-print-feedback" style="display:none; margin-bottom: 14px; padding: 12px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;"></div>
               <div id="selected-printer-banner" style="display:none; margin-bottom: 14px; padding: 10px 14px; background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 8px; font-size: 12px; color: #312E81; align-items: center; justify-content: space-between;"></div>
               <div id="printer-list" class="printer-list">
                 <div class="empty-state">Scanning local Windows printers...</div>
